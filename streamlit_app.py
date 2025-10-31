@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from pathlib import Path
 
 import streamlit as st
@@ -35,19 +34,17 @@ if uploaded_file:
         st.image(bytes_data, caption="原始图像预览", use_column_width=True)
         with st.spinner("模型推理中..."):
             try:
-                result = analyze_image_bytes(bytes_data, str(WEIGHTS_PATH))
+                result = analyze_image_bytes(bytes_data, make_cam=True, target_index=1)
             except Exception as exc:  # pragma: no cover - display to user
                 st.error(f"推理失败: {exc}")
             else:
-                prob = result["probability"]
-                st.metric("患 PCOS 概率", f"{prob * 100:.2f}%", help=result["prediction"])
+                st.metric("预测类别", result.get("pred"))
+                probs = result.get("probs")
+                if probs and len(probs) > 1:
+                    st.metric("患 PCOS 概率", f"{probs[1] * 100:.2f}%")
 
-                overlay_b64 = base64.b64encode(result["overlay_png"]).decode("ascii")
-                st.image(
-                    f"data:image/png;base64,{overlay_b64}",
-                    caption="Grad-CAM 热力图",
-                    use_column_width=True,
-                )
+                if result.get("overlay") is not None:
+                    st.image(result["overlay"], caption="Grad-CAM 热力图", use_column_width=True)
 
                 st.json({"logits": result.get("logits")})
 
