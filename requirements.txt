@@ -1,7 +1,8 @@
 streamlit>=1.39.0
-pytorch-grad-cam>=1.4.0
-torch
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+pytorch-grad-cam @ git+https://github.com/jacobgil/pytorch-grad-cam.git@v1.5.5
 opencv-python-headless>=4.9.0.80
 dlib>=19.24.2
-torchvision
 numpy
