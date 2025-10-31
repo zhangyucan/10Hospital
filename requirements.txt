@@ -1,9 +1,9 @@
-streamlit>=1.38
+streamlit>=1.39.0
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+pytorch-grad-cam @ git+https://github.com/jacobgil/pytorch-grad-cam.git@v1.5.5
+opencv-python-headless>=4.9.0.80
+dlib>=19.24.2
 numpy>=1.26
 Pillow>=10.0
-grad-cam==1.5.5
-torch==2.9.0
-torchvision==0.24.0
-opencv-python-headless==4.12.0.88
-
-
