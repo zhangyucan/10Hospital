@@ -1,11 +1,9 @@
 streamlit>=1.38
 numpy>=1.26
 Pillow>=10.0
-opencv-python-headless>=4.8
 grad-cam==1.5.5
-
-# 选一组“匹配版本”（推荐 2.9/0.24）：
 torch==2.9.0
 torchvision==0.24.0
+opencv-python-headless==4.12.0.88
 
 
