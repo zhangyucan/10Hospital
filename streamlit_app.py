@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-import numpy as np
 import streamlit as st
 
 from pcos_infer import analyze_image_bytes
@@ -49,6 +48,8 @@ if uploaded_file:
                     caption="Grad-CAM 热力图",
                     use_column_width=True,
                 )
+
+                st.json({"logits": result.get("logits")})
 
 else:
     st.info("请先上传图片。")

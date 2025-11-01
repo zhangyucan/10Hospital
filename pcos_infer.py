@@ -1,95 +1,86 @@
-"""Shared PCOS inference utilities for notebooks, Streamlit and other frontends."""
+"""Shared PCOS inference helpers refactored for Streamlit deployment."""
 from __future__ import annotations
 
 import functools
-from pathlib import Path
-from typing import Dict, Optional
+import io
+from typing import Dict
 
-import cv2
-import dlib
 import numpy as np
+from PIL import Image
 import torch
+import torch.nn.functional as F
 from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-from torchvision import transforms
 
 from model import get_model
 
+INPUT_SIZE = (512, 512)
 
-def _detect_primary_face(detector: dlib.fhog_object_detector, image_rgb: np.ndarray) -> Optional[np.ndarray]:
-    """Return the largest detected face crop; fall back to the full image if none."""
-    gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
-    faces = detector(gray)
-    if not faces:
-        return None
 
-    largest = max(faces, key=lambda f: f.width() * f.height())
-    x, y, w, h = largest.left(), largest.top(), largest.width(), largest.height()
-    x0, y0 = max(x, 0), max(y, 0)
-    x1, y1 = min(x0 + w, image_rgb.shape[1]), min(y0 + h, image_rgb.shape[0])
-    if x1 <= x0 or y1 <= y0:
-        return None
-    return image_rgb[y0:y1, x0:x1]
+def _overlay_cam_on_image(rgb01: np.ndarray, cam: np.ndarray, alpha: float = 0.35) -> np.ndarray:
+    """Blend Grad-CAM heatmap with the input image using a simple jet palette."""
+    cam_min, cam_max = float(cam.min()), float(cam.max())
+    if cam_max - cam_min < 1e-6:
+        normalized = np.zeros_like(cam)
+    else:
+        normalized = (cam - cam_min) / (cam_max - cam_min)
+
+    # Construct an approximate JET colormap without relying on OpenCV.
+    r = np.clip(1.5 * normalized - 0.5, 0.0, 1.0)
+    g = np.clip(1.5 - np.abs(2.0 * normalized - 1.0), 0.0, 1.0)
+    b = np.clip(1.5 * (1.0 - normalized) - 0.5, 0.0, 1.0)
+    heatmap = np.stack([r, g, b], axis=-1)
+
+    blended = heatmap * alpha + rgb01 * (1.0 - alpha)
+    return (np.clip(blended, 0.0, 1.0) * 255).astype(np.uint8)
 
 
 @functools.lru_cache(maxsize=1)
-def _load_model(model_path: str, device_str: str) -> torch.nn.Module:
-    """Load and cache the classification model on the desired device."""
+def _load_model(model_path: str) -> torch.nn.Module:
+    """Load the model once and keep it cached on CPU for subsequent calls."""
+    torch.set_num_threads(1)
     model = get_model("InceptionResNetV2")
-    state = torch.load(model_path, map_location=device_str)
+    state = torch.load(model_path, map_location="cpu")
     model.load_state_dict(state)
-    model.to(device_str)
     model.eval()
     return model
 
 
-def analyze_image_bytes(
-    image_bytes: bytes,
-    model_path: str,
-    device: Optional[str] = None,
-) -> Dict[str, object]:
-    """Predict PCOS probability from raw image bytes and return Grad-CAM overlay."""
-    raw_array = np.frombuffer(image_bytes, dtype=np.uint8)
-    raw = cv2.imdecode(raw_array, cv2.IMREAD_COLOR)
-    if raw is None:
-        raise ValueError("Unable to decode the uploaded image.")
+def _preprocess_image(image_bytes: bytes) -> tuple[torch.Tensor, np.ndarray]:
+    """Decode the uploaded image into a tensor and keep an RGB copy in [0, 1]."""
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    resized = image.resize(INPUT_SIZE, Image.BILINEAR)
+    rgb_array = np.asarray(resized, dtype=np.float32) / 255.0
+    tensor = torch.from_numpy(rgb_array).permute(2, 0, 1).unsqueeze(0)
+    return tensor, rgb_array
 
-    image_rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
-    detector = dlib.get_frontal_face_detector()
-    face = _detect_primary_face(detector, image_rgb) or image_rgb
-    face = face.astype(np.float32) / 255.0
-    face_resized = cv2.resize(face, (512, 512), interpolation=cv2.INTER_LINEAR)
 
-    preprocess = transforms.Compose([transforms.ToTensor()])
-    tensor = preprocess(face_resized).unsqueeze(0)
-
-    device_str = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    torch_device = torch.device(device_str)
-    model = _load_model(model_path, device_str)
-    input_tensor = tensor.to(torch_device)
+def analyze_image_bytes(image_bytes: bytes, model_path: str) -> Dict[str, object]:
+    """Predict PCOS probability and return accompanying Grad-CAM overlay."""
+    input_tensor, rgb = _preprocess_image(image_bytes)
+    model = _load_model(model_path)
 
     with torch.no_grad():
         logits = model(input_tensor)
-        probs = torch.softmax(logits, dim=1)
+        probs = F.softmax(logits, dim=1)
 
-    pcos_prob = float(probs[0, 1].cpu())
+    pcos_prob = float(probs[0, 1])
     prediction = "PCOS" if pcos_prob >= 0.5 else "Non-PCOS"
 
     target_layers = [model.conv2d_7b]
-    with GradCAM(model=model, target_layers=target_layers) as cam:
-        grayscale_cam = cam(input_tensor=input_tensor, targets=[ClassifierOutputTarget(1)])[0]
+    with GradCAM(model=model, target_layers=target_layers, use_cuda=False) as cam:
+        grayscale_cam = cam(
+            input_tensor=input_tensor,
+            targets=[ClassifierOutputTarget(1)],
+        )[0]
 
-    overlay = show_cam_on_image(face_resized, grayscale_cam, use_rgb=True)
-    overlay_uint8 = (overlay * 255).astype(np.uint8)
-    overlay_bgr = cv2.cvtColor(overlay_uint8, cv2.COLOR_RGB2BGR)
-    success, overlay_buf = cv2.imencode(".png", overlay_bgr)
-    if not success:
-        raise RuntimeError("Failed to encode Grad-CAM overlay as PNG.")
+    overlay = _overlay_cam_on_image(rgb, grayscale_cam)
+    buffer = io.BytesIO()
+    Image.fromarray(overlay).save(buffer, format="PNG")
 
     return {
         "probability": pcos_prob,
         "prediction": prediction,
-        "overlay_png": overlay_buf.tobytes(),
-        "face": face_resized,
+        "overlay_png": buffer.getvalue(),
+        "logits": logits[0].tolist(),
     }
