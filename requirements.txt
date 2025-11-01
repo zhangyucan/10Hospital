@@ -5,3 +5,4 @@ matplotlib>=3.8
 grad-cam==1.5.5
 torch==2.9.0
 torchvision==0.24.0
+opencv-python-headless==4.12.0.88
