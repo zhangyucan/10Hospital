@@ -1,6 +1,7 @@
---extra-index-url https://download.pytorch.org/whl/cpu
 streamlit>=1.39.0
-torch==2.9.0+cpu
-grad-cam==1.5.5
 numpy>=1.26
 Pillow>=10.0
+matplotlib>=3.8
+grad-cam==1.5.5
+torch==2.9.0
+torchvision==0.24.0
