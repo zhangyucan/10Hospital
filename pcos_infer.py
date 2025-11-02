@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
@@ -163,6 +164,99 @@ def predict(rgb01: np.ndarray):
     probs = F.softmax(logits, dim=1)
     pred = int(torch.argmax(probs, dim=1).item())
     return logits[0].tolist(), probs[0].tolist(), pred
+
+
+def batch_detect_and_crop_faces(root_folder: str, output_folder: Optional[str] = None) -> Dict[str, int]:
+    """
+    批量检测并裁剪文件夹中所有图像的人脸。
+    
+    Args:
+        root_folder: 根文件夹路径
+        output_folder: 输出文件夹路径（可选）。如果为None，则覆盖原文件
+        
+    Returns:
+        包含处理统计信息的字典：{'processed': int, 'faces_found': int, 'no_faces': int}
+    """
+    if cv2 is None or dlib is None:
+        raise ImportError("需要安装 cv2 和 dlib 才能使用人脸检测功能")
+    
+    import os
+    
+    detector = dlib.get_frontal_face_detector()
+    stats = {'processed': 0, 'faces_found': 0, 'no_faces': 0}
+    
+    for folder_name in os.listdir(root_folder):
+        folder_path = os.path.join(root_folder, folder_name)
+        
+        # 判断是否是文件夹
+        if os.path.isdir(folder_path):
+            # 如果指定了输出文件夹，创建对应的子文件夹
+            if output_folder is not None:
+                output_subfolder = os.path.join(output_folder, folder_name)
+                os.makedirs(output_subfolder, exist_ok=True)
+            
+            # 遍历子文件夹
+            for file_name in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file_name)
+                
+                # 判断是否是文件且为jpg格式
+                if os.path.isfile(file_path) and file_path.lower().endswith(".jpg"):
+                    try:
+                        # 读取输入图片
+                        img = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        
+                        if img is None:
+                            LOGGER.warning(f"无法读取图像: {file_path}")
+                            continue
+                        
+                        # 将图像转换为灰度图（人脸检测器要求输入为灰度图）
+                        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                        
+                        # 使用人脸检测器检测人脸
+                        faces = detector(gray)
+                        
+                        stats['processed'] += 1
+                        
+                        if len(faces) == 0:
+                            stats['no_faces'] += 1
+                            LOGGER.info(f"未检测到人脸: {file_path}")
+                            continue
+                        
+                        # 选择最大的人脸（如果检测到多个）
+                        face = max(faces, key=lambda f: f.width() * f.height())
+                        stats['faces_found'] += 1
+                        
+                        # 获取人脸的坐标
+                        x, y, w, h = face.left(), face.top(), face.width(), face.height()
+                        
+                        # 裁剪人脸，确保坐标不越界
+                        x = max(x, 0)
+                        y = max(y, 0)
+                        x_end = min(x + w, img.shape[1])
+                        y_end = min(y + h, img.shape[0])
+                        
+                        face_crop = img[y:y_end, x:x_end]
+                        
+                        # 保存裁剪后的人脸
+                        if output_folder is not None:
+                            save_path = os.path.join(output_subfolder, file_name)
+                        else:
+                            save_path = file_path
+                        
+                        # 使用 imencode 和 tofile 以支持中文路径
+                        is_success, buffer = cv2.imencode(".jpg", face_crop)
+                        if is_success:
+                            buffer.tofile(save_path)
+                            LOGGER.info(f"已处理并保存: {save_path}")
+                        else:
+                            LOGGER.error(f"保存失败: {save_path}")
+                            
+                    except Exception as e:
+                        LOGGER.error(f"处理图像时出错 {file_path}: {str(e)}")
+                        continue
+    
+    LOGGER.info(f"批量处理完成 - 总处理: {stats['processed']}, 检测到人脸: {stats['faces_found']}, 未检测到人脸: {stats['no_faces']}")
+    return stats
 
 
 def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: int = 1) -> Dict[str, object]:
