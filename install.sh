@@ -74,8 +74,8 @@ pip install cmake
 
 # 安装依赖
 echo ""
-echo "安装项目依赖..."
-pip install -r requirements.txt
+echo "安装项目依赖 (包含人脸检测)..."
+pip install -r requirements-full.txt
 
 # 验证安装
 echo ""

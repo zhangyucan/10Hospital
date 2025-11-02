@@ -1,0 +1,10 @@
+# Full requirements including face detection (for local development)
+# For Streamlit Cloud deployment, use requirements.txt instead
+
+-r requirements.txt
+
+# Face detection dependencies (requires system CMake)
+# Install CMake first: sudo apt-get install cmake build-essential
+opencv-python>=4.8.0
+cmake>=3.18.0
+dlib>=19.24.0

@@ -1,8 +1,24 @@
 # 安装指南 (Installation Guide)
 
-本项目需要人脸检测功能，依赖 `dlib` 和 `opencv-python`。`dlib` 的安装需要 CMake，请按照以下步骤操作。
+本项目支持两种部署方式：
 
-## 快速安装 (推荐方式)
+1. **云端部署** (Streamlit Cloud) - 无需安装，人脸检测不可用
+2. **本地开发** - 完整功能，包括人脸检测
+
+人脸检测功能依赖 `dlib` 和 `opencv-python`。`dlib` 的安装需要 CMake。
+
+## 云端部署 (推荐用于演示)
+
+直接部署到 Streamlit Cloud，无需任何安装：
+
+1. Fork 此仓库到你的 GitHub 账号
+2. 访问 [share.streamlit.io](https://share.streamlit.io)
+3. 连接你的 GitHub 账号并选择此仓库
+4. 点击 Deploy！
+
+**注意**: 云端部署不支持人脸检测（`dlib` 需要编译），但应用仍然可以正常工作，使用完整图像进行预测。
+
+## 本地开发安装 (推荐用于最佳性能)
 
 ### 方法 1: 使用 Conda (最简单，强烈推荐)
 
@@ -14,11 +30,11 @@ conda activate hospital
 # 通过 conda 安装 cmake 和 dlib (避免编译问题)
 conda install -c conda-forge cmake dlib opencv -y
 
-# 安装其他依赖
+# 安装其他依赖 (PyTorch, Streamlit 等)
 pip install -r requirements.txt
 ```
 
-### 方法 2: 使用系统包管理器 + pip
+### 方法 2: 使用系统包管理器 + pip (完整功能)
 
 #### Ubuntu/Debian:
 ```bash
@@ -32,8 +48,7 @@ source venv/bin/activate
 
 # 3. 安装 Python 依赖
 pip install --upgrade pip
-pip install cmake  # 先安装 cmake
-pip install -r requirements.txt
+pip install -r requirements-full.txt  # 包含人脸检测依赖
 ```
 
 #### macOS:
@@ -50,7 +65,7 @@ source venv/bin/activate
 
 # 4. 安装依赖
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-full.txt
 ```
 
 #### Windows:
@@ -66,7 +81,7 @@ venv\Scripts\activate
 
 # 3. 安装依赖
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-full.txt
 ```
 
 ## 验证安装
@@ -122,15 +137,16 @@ conda activate hospital
 
 或者切换到 conda 环境（推荐）。
 
-## 不安装人脸检测依赖
+## 简化安装 (不包含人脸检测)
 
-如果无法安装 dlib 和 opencv，系统会自动回退到使用完整图像进行预测（不进行人脸裁剪）。功能仍然可用，只是准确性可能会受影响。
+如果无法安装 dlib 和 opencv，或只想快速测试，可以使用核心依赖：
 
-跳过人脸检测依赖的安装：
 ```bash
-# 只安装核心依赖
-pip install streamlit numpy Pillow torch torchvision
+# 只安装核心依赖 (与 Streamlit Cloud 相同)
+pip install -r requirements.txt
 ```
+
+系统会自动检测并回退到使用完整图像进行预测（不进行人脸裁剪）。功能仍然可用，准确性可能略有影响。
 
 ## 启动应用
 

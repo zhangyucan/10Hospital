@@ -12,10 +12,24 @@ WEIGHTS_PATH = Path(__file__).parent / "weights" / "epoch006_0.00005_0.29149_0.8
 
 st.set_page_config(page_title="PCOS Probability Analyzer", page_icon="🩺")
 st.title("PCOS Probability Analyzer")
+
+# 检查人脸检测功能是否可用
+try:
+    import cv2
+    import dlib
+    face_detection_available = True
+    face_detection_msg = "✅ 人脸检测功能已启用"
+except ImportError:
+    face_detection_available = False
+    face_detection_msg = "ℹ️ 人脸检测功能未启用（将使用完整图像）"
+
 st.markdown(
-    """
-    上传一张人脸照片，模型会给出患 PCOS 的概率，并展示 Grad-CAM 热力图。\
-    模型仅用于科研原型，请勿作为医疗诊断依据。
+    f"""
+    上传一张人脸照片，模型会给出患 PCOS 的概率，并展示 Grad-CAM 热力图。
+    
+    **{face_detection_msg}**
+    
+    ⚠️ 模型仅用于科研原型，请勿作为医疗诊断依据。
     """
 )
 
