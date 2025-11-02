@@ -31,7 +31,6 @@ if uploaded_file:
     if not bytes_data:
         st.warning("文件为空，请重新上传。")
     else:
-        st.image(bytes_data, caption="原始图像预览", use_column_width=True)
         with st.spinner("模型推理中..."):
             try:
                 result = analyze_image_bytes(bytes_data, make_cam=True, target_index=1)
@@ -43,8 +42,10 @@ if uploaded_file:
                 if probs and len(probs) > 1:
                     st.metric("患 PCOS 概率", f"{probs[1] * 100:.2f}%")
 
+                if result.get("crop") is not None:
+                    st.image(result["crop"], caption="裁切后的人脸", use_column_width=True)
                 if result.get("overlay") is not None:
-                    st.image(result["overlay"], caption="Grad-CAM 热力图", use_column_width=True)
+                    st.image(result["overlay"], caption="裁切区域的 Grad-CAM", use_column_width=True)
 
                 st.json({"logits": result.get("logits")})
 

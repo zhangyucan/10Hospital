@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Dict, Optional
+from pathlib import Path
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 from PIL import Image
@@ -20,8 +21,8 @@ except ImportError:  # pragma: no cover - optional path
     cv2 = None  # type: ignore
     dlib = None  # type: ignore
 
-WEIGHTS_PATH = "weights/epoch006_0.00005_0.29149_0.8864.pth"
-# WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
+_BASE_DIR = Path(__file__).resolve().parent
+WEIGHTS_PATH = _BASE_DIR / "weights" / "epoch006_0.00005_0.29149_0.8864.pth"
 INPUT_SIZE = (512, 512)
 LOGGER = logging.getLogger(__name__)
 
@@ -110,7 +111,9 @@ class GradCAMMinimal:
         return self._normalize_cam(cam)
 
 
-def _decode_resize_to01(img_bytes: bytes, size_hw=INPUT_SIZE) -> np.ndarray:
+def _decode_resize_to01(
+    img_bytes: bytes, size_hw=INPUT_SIZE, return_preview: bool = False
+) -> Union[np.ndarray, Tuple[np.ndarray, Image.Image]]:
     image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     rgb = np.asarray(image, dtype=np.uint8)
 
@@ -124,7 +127,11 @@ def _decode_resize_to01(img_bytes: bytes, size_hw=INPUT_SIZE) -> np.ndarray:
 
     face_image = Image.fromarray(face)
     resized = face_image.resize(size_hw, Image.BILINEAR)
-    return np.asarray(resized, dtype=np.float32) / 255.0
+    rgb01 = np.asarray(resized, dtype=np.float32) / 255.0
+
+    if return_preview:
+        return rgb01, resized.copy()
+    return rgb01
 
 
 def _to_tensor(rgb01: np.ndarray) -> torch.Tensor:
@@ -140,7 +147,7 @@ def load_model() -> nn.Module:
         return _model_cache
     torch.set_num_threads(1)
     model = get_model("InceptionResNetV2")
-    state = torch.load(WEIGHTS_PATH, map_location="cpu")
+    state = torch.load(str(WEIGHTS_PATH), map_location="cpu")
     model.load_state_dict(state, strict=True)
     model.eval()
     _model_cache = model
@@ -158,7 +165,7 @@ def predict(rgb01: np.ndarray):
 
 
 def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: int = 1) -> Dict[str, object]:
-    rgb01 = _decode_resize_to01(img_bytes, size_hw=INPUT_SIZE)
+    rgb01, preview = _decode_resize_to01(img_bytes, size_hw=INPUT_SIZE, return_preview=True)
     logits, probs, pred = predict(rgb01)
 
     overlay_img = None
@@ -182,4 +189,5 @@ def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: i
         "probs": probs,
         "logits": logits,
         "overlay": overlay_img,
+        "crop": preview,
     }
