@@ -1,7 +1,8 @@
-"""Minimal, zero-external-deps Grad-CAM & inference helpers for Streamlit."""
+"""Minimal, deployment-friendly Grad-CAM & inference helpers for Streamlit."""
 from __future__ import annotations
 
 import io
+import logging
 from typing import Dict, Optional
 
 import numpy as np
@@ -12,8 +13,17 @@ import torch.nn.functional as F
 
 from model import get_model
 
-WEIGHTS_PATH = "weights/epoch006_0.00005_0.29149_0.8864.pth"
+try:  # Optional preprocessing dependencies
+    import cv2
+    import dlib
+except ImportError:  # pragma: no cover - optional path
+    cv2 = None  # type: ignore
+    dlib = None  # type: ignore
+
+# WEIGHTS_PATH = "weights/epoch006_0.00005_0.29149_0.8864.pth"
+WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
 INPUT_SIZE = (512, 512)
+LOGGER = logging.getLogger(__name__)
 
 
 def _overlay_cam_on_image(rgb01: np.ndarray, cam01: np.ndarray, alpha: float = 0.35) -> np.ndarray:
@@ -24,6 +34,28 @@ def _overlay_cam_on_image(rgb01: np.ndarray, cam01: np.ndarray, alpha: float = 0
     heatmap = np.stack([r, g, b], axis=-1)
     out = heatmap * alpha + np.clip(rgb01, 0, 1) * (1 - alpha)
     return (np.clip(out, 0, 1) * 255).astype(np.uint8)
+
+
+def _detect_primary_face(image_rgb: np.ndarray) -> Optional[np.ndarray]:
+    """Try to crop the most prominent face; fall back to the full frame if unavailable."""
+
+    if cv2 is None or dlib is None:
+        return None
+
+    detector = dlib.get_frontal_face_detector()
+    gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
+    faces = detector(gray)
+    if not faces:
+        return None
+
+    largest = max(faces, key=lambda f: f.width() * f.height())
+    x, y, w, h = largest.left(), largest.top(), largest.width(), largest.height()
+    x0, y0 = max(x, 0), max(y, 0)
+    x1 = min(x0 + w, image_rgb.shape[1])
+    y1 = min(y0 + h, image_rgb.shape[0])
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return image_rgb[y0:y1, x0:x1]
 
 
 class GradCAMMinimal:
@@ -79,8 +111,20 @@ class GradCAMMinimal:
 
 
 def _decode_resize_to01(img_bytes: bytes, size_hw=INPUT_SIZE) -> np.ndarray:
-    image = Image.open(io.BytesIO(img_bytes)).convert("RGB").resize(size_hw, Image.BILINEAR)
-    return np.asarray(image, dtype=np.float32) / 255.0
+    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    rgb = np.asarray(image, dtype=np.uint8)
+
+    face = _detect_primary_face(rgb)
+    if face is None:
+        if cv2 is None or dlib is None:
+            LOGGER.debug("Face detection skipped (cv2/dlib unavailable); using full frame.")
+        else:
+            LOGGER.debug("Face detector found no faces; using full frame.")
+        face = rgb
+
+    face_image = Image.fromarray(face)
+    resized = face_image.resize(size_hw, Image.BILINEAR)
+    return np.asarray(resized, dtype=np.float32) / 255.0
 
 
 def _to_tensor(rgb01: np.ndarray) -> torch.Tensor:
