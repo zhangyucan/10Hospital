@@ -7,6 +7,8 @@ import streamlit as st
 from pcos_infer import analyze_image_bytes
 
 WEIGHTS_PATH = Path(__file__).parent / "weights" / "epoch006_0.00005_0.29149_0.8864.pth"
+# WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
+
 
 st.set_page_config(page_title="PCOS Probability Analyzer", page_icon="🩺")
 st.title("PCOS Probability Analyzer")

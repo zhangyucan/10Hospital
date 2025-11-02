@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - optional path
 
 _BASE_DIR = Path(__file__).resolve().parent
 WEIGHTS_PATH = _BASE_DIR / "weights" / "epoch006_0.00005_0.29149_0.8864.pth"
+# WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
 INPUT_SIZE = (512, 512)
 LOGGER = logging.getLogger(__name__)
 
