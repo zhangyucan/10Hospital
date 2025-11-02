@@ -5,3 +5,7 @@ Pillow>=10.0
 # CPU environment (compatible with Py3.13)
 torch==2.9.0
 torchvision==0.24.0
+
+# Face detection dependencies (optional but recommended)
+opencv-python>=4.8.0
+dlib>=19.24.0

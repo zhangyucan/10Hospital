@@ -12,7 +12,22 @@ This repository contains a lightweight demo for estimating the probability of po
 	```bash
 	pip install -r requirements.txt
 	```
-2. Ensure the model weights are available in `weights/epoch006_0.00005_0.29149_0.8864.pth` (Git LFS handles downloads automatically).
+	
+	Note: Installing `dlib` requires CMake. If you encounter issues:
+	```bash
+	# Using conda (recommended)
+	conda install -c conda-forge cmake
+	pip install -r requirements.txt
+	
+	# Or on Ubuntu/Debian
+	sudo apt-get install cmake
+	pip install -r requirements.txt
+	```
+
+2. Ensure the model weights are available in `weights/` directory (Git LFS handles downloads automatically):
+   - `epoch006_0.00005_0.29149_0.8864.pth` - PCOS classification model
+   - `shape_predictor_68_face_landmarks.dat` - Face landmark detector (optional, improves face alignment)
+
 3. Launch the Streamlit UI:
 	```bash
 	streamlit run streamlit_app.py
@@ -20,4 +35,7 @@ This repository contains a lightweight demo for estimating the probability of po
 
 ## Notes
 - The model is intended for research and demonstration only; it is *not* a medical diagnostic.
-- Optional preprocessing uses `dlib` and `opencv-python` for face detection. When they are unavailable, the full image is used instead.
+- **Face Detection**: The system uses `dlib` and `opencv-python` for automatic face detection and cropping:
+  - When available, faces are automatically detected and cropped before prediction
+  - The `shape_predictor_68_face_landmarks.dat` file enables more precise face alignment using 68 facial landmarks
+  - When dependencies are unavailable or no face is detected, the full image is used instead

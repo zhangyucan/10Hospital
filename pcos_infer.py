@@ -24,9 +24,13 @@ except ImportError:  # pragma: no cover - optional path
 
 _BASE_DIR = Path(__file__).resolve().parent
 WEIGHTS_PATH = _BASE_DIR / "weights" / "epoch006_0.00005_0.29149_0.8864.pth"
+SHAPE_PREDICTOR_PATH = _BASE_DIR / "weights" / "shape_predictor_68_face_landmarks.dat"
 # WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
 INPUT_SIZE = (512, 512)
 LOGGER = logging.getLogger(__name__)
+
+# 缓存 shape predictor 以避免重复加载
+_shape_predictor_cache: Optional[object] = None
 
 
 def _overlay_cam_on_image(rgb01: np.ndarray, cam01: np.ndarray, alpha: float = 0.35) -> np.ndarray:
@@ -39,8 +43,36 @@ def _overlay_cam_on_image(rgb01: np.ndarray, cam01: np.ndarray, alpha: float = 0
     return (np.clip(out, 0, 1) * 255).astype(np.uint8)
 
 
-def _detect_primary_face(image_rgb: np.ndarray) -> Optional[np.ndarray]:
-    """Try to crop the most prominent face; fall back to the full frame if unavailable."""
+def _get_shape_predictor():
+    """延迟加载并缓存 shape predictor"""
+    global _shape_predictor_cache
+    if _shape_predictor_cache is not None:
+        return _shape_predictor_cache
+    
+    if dlib is None:
+        return None
+    
+    if not SHAPE_PREDICTOR_PATH.exists():
+        LOGGER.warning(f"Shape predictor 文件不存在: {SHAPE_PREDICTOR_PATH}")
+        return None
+    
+    try:
+        _shape_predictor_cache = dlib.shape_predictor(str(SHAPE_PREDICTOR_PATH))
+        LOGGER.info(f"成功加载 shape predictor: {SHAPE_PREDICTOR_PATH}")
+        return _shape_predictor_cache
+    except Exception as e:
+        LOGGER.error(f"加载 shape predictor 失败: {e}")
+        return None
+
+
+def _detect_primary_face(image_rgb: np.ndarray, use_alignment: bool = True) -> Optional[np.ndarray]:
+    """
+    Try to crop the most prominent face; fall back to the full frame if unavailable.
+    
+    Args:
+        image_rgb: RGB 图像数组
+        use_alignment: 是否使用 shape predictor 进行人脸对齐（需要 shape_predictor_68_face_landmarks.dat）
+    """
 
     if cv2 is None or dlib is None:
         LOGGER.info("人脸检测模块未安装 (cv2/dlib)，将使用完整图像")
@@ -55,6 +87,31 @@ def _detect_primary_face(image_rgb: np.ndarray) -> Optional[np.ndarray]:
             return None
 
         largest = max(faces, key=lambda f: f.width() * f.height())
+        
+        # 如果启用对齐且 shape predictor 可用，使用关键点扩展边界框
+        if use_alignment:
+            predictor = _get_shape_predictor()
+            if predictor is not None:
+                try:
+                    shape = predictor(gray, largest)
+                    # 获取所有68个关键点的坐标
+                    points = np.array([[shape.part(i).x, shape.part(i).y] for i in range(68)])
+                    # 使用关键点的边界来裁剪，这样更精确
+                    x_min, y_min = points.min(axis=0)
+                    x_max, y_max = points.max(axis=0)
+                    # 添加一些边距（10%）
+                    margin_x = int((x_max - x_min) * 0.1)
+                    margin_y = int((y_max - y_min) * 0.1)
+                    x0 = max(0, x_min - margin_x)
+                    y0 = max(0, y_min - margin_y)
+                    x1 = min(image_rgb.shape[1], x_max + margin_x)
+                    y1 = min(image_rgb.shape[0], y_max + margin_y)
+                    LOGGER.info(f"使用 shape predictor 检测到人脸关键点，区域: ({x0}, {y0}) -> ({x1}, {y1})")
+                    return image_rgb[y0:y1, x0:x1]
+                except Exception as e:
+                    LOGGER.warning(f"Shape predictor 处理失败，回退到基础检测: {e}")
+        
+        # 基础检测：使用 dlib 检测框
         x, y, w, h = largest.left(), largest.top(), largest.width(), largest.height()
         x0, y0 = max(x, 0), max(y, 0)
         x1 = min(x0 + w, image_rgb.shape[1])
