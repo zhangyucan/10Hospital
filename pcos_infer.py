@@ -43,22 +43,31 @@ def _detect_primary_face(image_rgb: np.ndarray) -> Optional[np.ndarray]:
     """Try to crop the most prominent face; fall back to the full frame if unavailable."""
 
     if cv2 is None or dlib is None:
+        LOGGER.info("人脸检测模块未安装 (cv2/dlib)，将使用完整图像")
         return None
 
-    detector = dlib.get_frontal_face_detector()
-    gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
-    faces = detector(gray)
-    if not faces:
-        return None
+    try:
+        detector = dlib.get_frontal_face_detector()
+        gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
+        faces = detector(gray, 1)  # 使用上采样次数为1以提高检测率
+        if not faces:
+            LOGGER.info("未检测到人脸，将使用完整图像")
+            return None
 
-    largest = max(faces, key=lambda f: f.width() * f.height())
-    x, y, w, h = largest.left(), largest.top(), largest.width(), largest.height()
-    x0, y0 = max(x, 0), max(y, 0)
-    x1 = min(x0 + w, image_rgb.shape[1])
-    y1 = min(y0 + h, image_rgb.shape[0])
-    if x1 <= x0 or y1 <= y0:
+        largest = max(faces, key=lambda f: f.width() * f.height())
+        x, y, w, h = largest.left(), largest.top(), largest.width(), largest.height()
+        x0, y0 = max(x, 0), max(y, 0)
+        x1 = min(x0 + w, image_rgb.shape[1])
+        y1 = min(y0 + h, image_rgb.shape[0])
+        if x1 <= x0 or y1 <= y0:
+            LOGGER.warning("检测到的人脸区域无效")
+            return None
+        
+        LOGGER.info(f"成功检测到人脸，区域: ({x0}, {y0}) -> ({x1}, {y1})")
+        return image_rgb[y0:y1, x0:x1]
+    except Exception as e:
+        LOGGER.error(f"人脸检测过程出错: {e}")
         return None
-    return image_rgb[y0:y1, x0:x1]
 
 
 class GradCAMMinimal:
@@ -118,14 +127,15 @@ def _decode_resize_to01(
 ) -> Union[np.ndarray, Tuple[np.ndarray, Image.Image]]:
     image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     rgb = np.asarray(image, dtype=np.uint8)
+    
+    LOGGER.info(f"原始图像尺寸: {rgb.shape}")
 
     face = _detect_primary_face(rgb)
     if face is None:
-        if cv2 is None or dlib is None:
-            LOGGER.debug("Face detection skipped (cv2/dlib unavailable); using full frame.")
-        else:
-            LOGGER.debug("Face detector found no faces; using full frame.")
+        LOGGER.info("使用完整图像进行预测")
         face = rgb
+    else:
+        LOGGER.info(f"使用检测到的人脸区域进行预测，尺寸: {face.shape}")
 
     face_image = Image.fromarray(face)
     resized = face_image.resize(size_hw, Image.BILINEAR)

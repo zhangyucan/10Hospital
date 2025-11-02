@@ -35,21 +35,33 @@ if uploaded_file:
     else:
         with st.spinner("模型推理中..."):
             try:
+                # 配置日志以便在控制台看到人脸检测信息
+                import logging
+                logging.basicConfig(level=logging.INFO)
+                
                 result = analyze_image_bytes(bytes_data, make_cam=True, target_index=1)
             except Exception as exc:  # pragma: no cover - display to user
                 st.error(f"推理失败: {exc}")
             else:
-                st.metric("预测类别", result.get("pred"))
-                probs = result.get("probs")
-                if probs and len(probs) > 1:
-                    st.metric("患 PCOS 概率", f"{probs[1] * 100:.2f}%")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("预测类别", result.get("pred"))
+                with col2:
+                    probs = result.get("probs")
+                    if probs and len(probs) > 1:
+                        st.metric("患 PCOS 概率", f"{probs[1] * 100:.2f}%")
 
-                if result.get("crop") is not None:
-                    st.image(result["crop"], caption="裁切后的人脸", use_column_width=True)
-                if result.get("overlay") is not None:
-                    st.image(result["overlay"], caption="裁切区域的 Grad-CAM", use_column_width=True)
+                # 显示处理后的图像
+                col3, col4 = st.columns(2)
+                with col3:
+                    if result.get("crop") is not None:
+                        st.image(result["crop"], caption="预测输入图像（人脸裁切）", use_column_width=True)
+                with col4:
+                    if result.get("overlay") is not None:
+                        st.image(result["overlay"], caption="Grad-CAM 热力图", use_column_width=True)
 
-                st.json({"logits": result.get("logits")})
+                with st.expander("查看详细信息"):
+                    st.json({"logits": result.get("logits"), "probs": result.get("probs")})
 
 else:
     st.info("请先上传图片。")
