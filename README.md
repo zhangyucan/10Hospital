@@ -8,21 +8,26 @@ This repository contains a lightweight demo for estimating the probability of po
 - Jupyter notebook (`test.ipynb`) showing an end-to-end inference and visualization pipeline.
 
 ## Quick Start
-1. Install dependencies:
-	```bash
-	pip install -r requirements.txt
-	```
-	
-	Note: Installing `dlib` requires CMake. If you encounter issues:
-	```bash
-	# Using conda (recommended)
-	conda install -c conda-forge cmake
-	pip install -r requirements.txt
-	
-	# Or on Ubuntu/Debian
-	sudo apt-get install cmake
-	pip install -r requirements.txt
-	```
+
+### Automatic Installation (Recommended)
+```bash
+# Using the install script (Linux/macOS)
+./install.sh
+
+# Or using conda (easiest, works on all platforms)
+conda create -n hospital python=3.10 -y
+conda activate hospital
+conda install -c conda-forge cmake dlib opencv -y
+pip install -r requirements.txt
+```
+
+### Manual Installation
+See [INSTALL.md](INSTALL.md) for detailed installation instructions for different platforms.
+
+**Important**: `dlib` requires CMake to be installed via your system package manager:
+- Ubuntu/Debian: `sudo apt-get install cmake`
+- macOS: `brew install cmake`
+- Windows: Download from [cmake.org](https://cmake.org/download/)
 
 2. Ensure the model weights are available in `weights/` directory (Git LFS handles downloads automatically):
    - `epoch006_0.00005_0.29149_0.8864.pth` - PCOS classification model

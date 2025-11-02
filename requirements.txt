@@ -7,5 +7,8 @@ torch==2.9.0
 torchvision==0.24.0
 
 # Face detection dependencies (optional but recommended)
+# Note: dlib requires CMake to be installed first via system package manager
+# Run: sudo apt-get install cmake (Ubuntu/Debian) or conda install cmake
 opencv-python>=4.8.0
+cmake>=3.18.0  # Required for building dlib
 dlib>=19.24.0
