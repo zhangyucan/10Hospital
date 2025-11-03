@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 from PIL import Image
@@ -14,13 +14,6 @@ import torch.nn.functional as F
 
 from model import get_model
 
-# 可选人脸检测（基于 PyTorch MTCNN，无需编译）
-try:
-    from face_detect import crop_face_or_full
-    HAVE_FACE_DETECT = True
-except Exception:
-    HAVE_FACE_DETECT = False
-
 _BASE_DIR = Path(__file__).resolve().parent
 WEIGHTS_PATH = _BASE_DIR / "weights" / "epoch006_0.00005_0.29149_0.8864.pth"
 INPUT_SIZE = (512, 512)
@@ -28,6 +21,93 @@ LOGGER = logging.getLogger(__name__)
 
 # 模型缓存
 _model_cache: Optional[nn.Module] = None
+
+# MTCNN 人脸检测缓存
+_MTCNN = None
+
+
+def _get_mtcnn():
+    """延迟初始化 MTCNN，避免影响其他功能"""
+    global _MTCNN
+    if _MTCNN is None:
+        try:
+            from facenet_pytorch import MTCNN
+            _MTCNN = MTCNN(keep_all=False, device='cpu', post_process=False)
+            LOGGER.info("✅ 使用 MTCNN (PyTorch) 人脸检测")
+        except Exception as e:
+            LOGGER.warning(f"⚠️ MTCNN 不可用: {e}")
+            _MTCNN = False  # 标记为不可用
+    return _MTCNN if _MTCNN is not False else None
+
+
+def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[Tuple[int, int, int, int]]:
+    """
+    使用 MTCNN 检测图像中置信度最高的人脸
+    
+    Args:
+        pil_img: PIL Image 对象
+        conf_thres: 置信度阈值
+        
+    Returns:
+        (x1, y1, x2, y2) 人脸框坐标，或 None（未检测到）
+    """
+    mtcnn = _get_mtcnn()
+    if mtcnn is None:
+        return None
+    
+    try:
+        boxes, probs = mtcnn.detect(pil_img)
+        if boxes is not None and probs is not None and len(boxes) > 0:
+            i = int(np.nanargmax(probs))
+            if probs[i] is not None and probs[i] >= conf_thres:
+                x1, y1, x2, y2 = boxes[i]
+                return tuple(map(int, [x1, y1, x2, y2]))
+    except Exception as e:
+        LOGGER.warning(f"MTCNN 检测失败: {e}")
+    
+    return None
+
+
+def crop_face_square(pil_img: Image.Image, out_size: Tuple[int, int] = (512, 512)) -> Tuple[np.ndarray, Optional[Tuple[int, int, int, int]]]:
+    """
+    检测并裁剪人脸为正方形（与 dlib 训练预处理一致）
+    
+    Args:
+        pil_img: 输入 PIL Image
+        out_size: 输出尺寸
+        
+    Returns:
+        tuple: (rgb01_array, box_or_None)
+            - rgb01_array: 归一化后的 RGB 数组 [0-1]，如果未检测到人脸返回 None
+            - box_or_None: 检测到的人脸框 (x1, y1, x2, y2) 或 None
+    """
+    box = detect_face_box(pil_img)
+    
+    if box is None:
+        # 未检测到人脸，返回 None
+        return None, None
+    
+    x1, y1, x2, y2 = box
+    w, h = x2 - x1, y2 - y1
+    
+    # 扩展到正方形（以较大边为准，与 dlib 训练一致）
+    max_side = max(w, h)
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    
+    # 计算正方形框的坐标（不扩展边距，margin=0.0）
+    half_size = max_side / 2
+    x1_new = int(max(0, cx - half_size))
+    x2_new = int(min(pil_img.width, cx + half_size))
+    y1_new = int(max(0, cy - half_size))
+    y2_new = int(min(pil_img.height, cy + half_size))
+    
+    face = pil_img.crop((x1_new, y1_new, x2_new, y2_new))
+    
+    # Resize 到目标尺寸（使用 LANCZOS 高质量插值）
+    face = face.resize(out_size, Image.Resampling.LANCZOS)
+    arr = np.asarray(face).astype("float32") / 255.0
+    
+    return arr, box
 
 
 def _overlay_cam_on_image(rgb01: np.ndarray, cam01: np.ndarray, alpha: float = 0.35) -> np.ndarray:
@@ -137,38 +217,56 @@ def analyze_image_bytes(img_bytes: bytes, use_face: bool = True, make_cam: bool 
     
     Args:
         img_bytes: 图像字节流
-        use_face: 是否启用人脸检测
+        use_face: 是否启用人脸检测（必须检测到人脸才进行预测）
         make_cam: 是否生成 Grad-CAM 热力图
         target_index: Grad-CAM 目标类别索引
         
     Returns:
         dict: 包含预测结果、概率、热力图等信息
+              如果未检测到人脸，返回错误信息
     """
     # 读取图像
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     
-    # 人脸检测 + 裁剪（或回退到完整图像）
-    # 使用与 dlib 训练一致的预处理参数：
-    # - margin=0.0: 不扩展边距（与训练时一致）
-    # - force_square=True: 强制正方形（dlib 检测框扩展为正方形）
-    bbox = None
-    if use_face and HAVE_FACE_DETECT:
+    # 人脸检测 + 裁剪（必须检测到人脸）
+    if use_face:
         try:
-            rgb01, bbox = crop_face_or_full(
-                img, 
-                out_size=INPUT_SIZE, 
-                margin=0.0,  # 不扩展边距，与 dlib 训练一致
-                force_square=True  # 强制正方形，与 dlib 训练一致
-            )
-            detector_method = "MTCNN (PyTorch)" if bbox else "完整图像（未检测到人脸）"
-            LOGGER.info(f"人脸检测: {detector_method}")
+            rgb01, bbox = crop_face_square(img, out_size=INPUT_SIZE)
+            
+            if rgb01 is None or bbox is None:
+                # 未检测到人脸，返回错误
+                LOGGER.warning("未检测到人脸")
+                return {
+                    "error": "未检测到人脸",
+                    "message": "请上传包含清晰人脸的照片。建议：正面拍摄、光线充足、避免遮挡。",
+                    "pred": None,
+                    "probs": None,
+                    "logits": None,
+                    "overlay": None,
+                    "crop": None,
+                    "detector": "MTCNN (未检测到)",
+                    "bbox": None,
+                }
+            
+            LOGGER.info(f"成功检测到人脸: {bbox}")
         except Exception as e:
-            LOGGER.warning(f"人脸检测失败，使用完整图像: {e}")
-            rgb01 = np.asarray(img.resize(INPUT_SIZE)).astype("float32") / 255.0
-            detector_method = "完整图像（检测出错）"
+            LOGGER.error(f"人脸检测出错: {e}")
+            return {
+                "error": "人脸检测失败",
+                "message": f"检测过程出错: {str(e)}",
+                "pred": None,
+                "probs": None,
+                "logits": None,
+                "overlay": None,
+                "crop": None,
+                "detector": "MTCNN (出错)",
+                "bbox": None,
+            }
     else:
+        # 不使用人脸检测，直接使用完整图像
         rgb01 = np.asarray(img.resize(INPUT_SIZE)).astype("float32") / 255.0
-        detector_method = "完整图像（未启用检测）"
+        bbox = None
+        LOGGER.info("未启用人脸检测，使用完整图像")
     
     # 预测
     logits, probs, pred = predict(rgb01)
@@ -200,6 +298,6 @@ def analyze_image_bytes(img_bytes: bytes, use_face: bool = True, make_cam: bool 
         "logits": logits,
         "overlay": overlay_img,
         "crop": preview_img,
-        "detector": detector_method,
+        "detector": "MTCNN (PyTorch)" if bbox else "完整图像",
         "bbox": bbox,
     }

@@ -75,7 +75,11 @@ if uploaded_file:
                 import traceback
                 st.code(traceback.format_exc())
             else:
-
+                # 检查是否检测到人脸
+                if result.get("error"):
+                    st.error(f"❌ {result.get('error')}")
+                    st.warning(result.get("message", "请重新上传图片"))
+                    st.stop()
 
                 col1, col2 = st.columns(2)
                 with col1:
