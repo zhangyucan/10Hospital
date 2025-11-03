@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
+from PIL import Image, ImageDraw
 import streamlit as st
 
 from pcos_infer import analyze_image_bytes
@@ -14,31 +16,13 @@ st.set_page_config(page_title="PCOS 辅助筛查系统", page_icon="🩺")
 st.title("多囊卵巢综合征（PCOS）辅助筛查系统")
 
 # 检查人脸检测功能是否可用
-face_detection_methods = []
 try:
-    import mediapipe as mp
-    face_detection_methods.append("MediaPipe")
-except ImportError:
-    pass
-
-try:
-    import dlib
-    face_detection_methods.append("dlib")
-except ImportError:
-    pass
-
-try:
-    import cv2
-    face_detection_methods.append("OpenCV Haar")
-except ImportError:
-    pass
-
-if face_detection_methods:
+    from face_detect import crop_face_or_full
     face_detection_available = True
-    face_detection_msg = f"✅ 人脸检测功能已启用 ({', '.join(face_detection_methods)})"
-else:
+    face_detection_msg = "✅ 人脸检测功能可用 (MTCNN - PyTorch)"
+except Exception:
     face_detection_available = False
-    face_detection_msg = "ℹ️ 人脸检测功能未启用（将使用完整图像）"
+    face_detection_msg = "ℹ️ 人脸检测功能未安装（将使用完整图像）"
 
 st.markdown(
     f"""
@@ -49,6 +33,25 @@ st.markdown(
     ⚠️ **重要提示**：本系统仅供科研参考使用，不能替代专业医疗诊断。如有疑虑，请及时就医咨询专业医生。
     """
 )
+
+# 侧边栏设置
+with st.sidebar:
+    st.header("⚙️ 设置")
+    use_face_detection = st.checkbox(
+        "启用人脸检测（MTCNN）", 
+        value=face_detection_available,  # 默认开启（如果可用）
+        disabled=not face_detection_available,
+        help="使用 PyTorch MTCNN 检测并裁剪人脸区域。如果检测失败，将自动使用完整图像。"
+    )
+    
+    st.markdown("---")
+    st.markdown("""
+    ### 关于人脸检测
+    - ✅ 纯 PyTorch 实现
+    - ✅ 无需编译依赖
+    - ✅ 自动回退机制
+    - 💡 建议：如果训练数据使用完整图像，可关闭此选项
+    """)
 
 if not WEIGHTS_PATH.exists():
     st.error(
@@ -70,9 +73,16 @@ if uploaded_file:
                 import logging
                 logging.basicConfig(level=logging.INFO)
                 
-                result = analyze_image_bytes(bytes_data, make_cam=True, target_index=1)
+                result = analyze_image_bytes(
+                    bytes_data, 
+                    use_face=use_face_detection,
+                    make_cam=True, 
+                    target_index=1
+                )
             except Exception as exc:  # pragma: no cover - display to user
                 st.error(f"推理失败: {exc}")
+                import traceback
+                st.code(traceback.format_exc())
             else:
                 # 显示实际使用的人脸检测方法
                 detector_used = result.get("detector") or "none"
@@ -118,6 +128,16 @@ if uploaded_file:
                 with col3:
                     if result.get("crop") is not None:
                         st.image(result["crop"], caption="分析输入图像", use_column_width=True)
+                    
+                    # 如果检测到人脸框，显示原图 + 框标注
+                    if result.get("bbox") is not None and use_face_detection:
+                        from PIL import ImageDraw
+                        img_with_box = Image.open(io.BytesIO(bytes_data)).convert("RGB")
+                        draw = ImageDraw.Draw(img_with_box)
+                        bbox = result["bbox"]
+                        draw.rectangle(bbox, outline=(255, 0, 0), width=3)
+                        st.image(img_with_box, caption="人脸检测结果（红框）", use_column_width=True)
+                
                 with col4:
                     if result.get("overlay") is not None:
                         st.image(result["overlay"], caption="模型关注区域热力图", use_column_width=True)

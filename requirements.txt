@@ -3,3 +3,6 @@ numpy>=1.26
 Pillow>=10.0
 torch>=2.5.0
 torchvision>=0.20.0
+
+# 可选人脸检测（基于 PyTorch，无需编译）
+facenet-pytorch
