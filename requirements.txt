@@ -1,7 +1,5 @@
 streamlit>=1.38
 numpy>=1.26
 Pillow>=10.0
-
-# CPU environment - compatible with Python 3.13
 torch>=2.5.0
 torchvision>=0.20.0

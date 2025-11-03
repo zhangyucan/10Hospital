@@ -182,8 +182,7 @@ class Block17(nn.Module):
 
         self.branch1 = nn.Sequential(
             BasicConv2d(1088, 128, kernel_size=1, stride=1),
-            BasicConv2d(128, 160, kernel_size=(
-                1, 7), stride=1, padding=(0, 3)),
+            BasicConv2d(128, 160, kernel_size=(1, 7), stride=1, padding=(0, 3)),
             BasicConv2d(160, 192, kernel_size=(7, 1), stride=1, padding=(3, 0))
         )
 
@@ -244,8 +243,7 @@ class Block8(nn.Module):
 
         self.branch1 = nn.Sequential(
             BasicConv2d(2080, 192, kernel_size=1, stride=1),
-            BasicConv2d(192, 224, kernel_size=(
-                1, 3), stride=1, padding=(0, 1)),
+            BasicConv2d(192, 224, kernel_size=(1, 3), stride=1, padding=(0, 1)),
             BasicConv2d(224, 256, kernel_size=(3, 1), stride=1, padding=(1, 0))
         )
 
