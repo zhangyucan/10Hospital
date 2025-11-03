@@ -148,10 +148,18 @@ def analyze_image_bytes(img_bytes: bytes, use_face: bool = True, make_cam: bool 
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     
     # 人脸检测 + 裁剪（或回退到完整图像）
+    # 使用与 dlib 训练一致的预处理参数：
+    # - margin=0.0: 不扩展边距（与训练时一致）
+    # - force_square=True: 强制正方形（dlib 检测框扩展为正方形）
     bbox = None
     if use_face and HAVE_FACE_DETECT:
         try:
-            rgb01, bbox = crop_face_or_full(img, out_size=INPUT_SIZE)
+            rgb01, bbox = crop_face_or_full(
+                img, 
+                out_size=INPUT_SIZE, 
+                margin=0.0,  # 不扩展边距，与 dlib 训练一致
+                force_square=True  # 强制正方形，与 dlib 训练一致
+            )
             detector_method = "MTCNN (PyTorch)" if bbox else "完整图像（未检测到人脸）"
             LOGGER.info(f"人脸检测: {detector_method}")
         except Exception as e:

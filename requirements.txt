@@ -4,5 +4,6 @@ Pillow>=10.0
 torch>=2.5.0
 torchvision>=0.20.0
 
-# 可选人脸检测（基于 PyTorch，无需编译）
+# 人脸检测（基于 PyTorch MTCNN，无需编译）
+# 云端部署使用，与 dlib 训练预处理保持一致
 facenet-pytorch
