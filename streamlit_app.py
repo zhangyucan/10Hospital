@@ -60,6 +60,15 @@ if not WEIGHTS_PATH.exists():
     )
     st.stop()
 
+# 重要提示
+st.warning("""
+📸 **图像拍摄建议**：
+- ⚠️ 请**关闭美颜、滤镜等后处理功能**
+- 💡 使用自然光线拍摄，避免过度曝光或阴影
+- 📷 拍摄方式的差异（光线、角度、相机设置等）可能影响分析结果
+- 🎯 建议使用原始、未经处理的照片以获得更准确的评估
+""")
+
 uploaded_file = st.file_uploader("选择一张图片", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
