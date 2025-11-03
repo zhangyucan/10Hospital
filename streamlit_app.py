@@ -128,15 +128,6 @@ if uploaded_file:
                 with col3:
                     if result.get("crop") is not None:
                         st.image(result["crop"], caption="分析输入图像", use_column_width=True)
-                    
-                    # 如果检测到人脸框，显示原图 + 框标注
-                    if result.get("bbox") is not None and use_face_detection:
-                        from PIL import ImageDraw
-                        img_with_box = Image.open(io.BytesIO(bytes_data)).convert("RGB")
-                        draw = ImageDraw.Draw(img_with_box)
-                        bbox = result["bbox"]
-                        draw.rectangle(bbox, outline=(255, 0, 0), width=3)
-                        st.image(img_with_box, caption="人脸检测结果（红框）", use_column_width=True)
                 
                 with col4:
                     if result.get("overlay") is not None:
