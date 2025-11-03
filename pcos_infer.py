@@ -21,23 +21,10 @@ LOGGER = logging.getLogger(__name__)
 
 # 模型缓存
 _model_cache: Optional[nn.Module] = None
+from facenet_pytorch import MTCNN
+_MTCNN = MTCNN(keep_all=False, device='cpu', post_process=False)
+LOGGER.info("✅ 使用 MTCNN (PyTorch) 人脸检测")
 
-# MTCNN 人脸检测缓存
-_MTCNN = None
-
-
-def _get_mtcnn():
-    """延迟初始化 MTCNN，避免影响其他功能"""
-    global _MTCNN
-    if _MTCNN is None:
-        try:
-            from facenet_pytorch import MTCNN
-            _MTCNN = MTCNN(keep_all=False, device='cpu', post_process=False)
-            LOGGER.info("✅ 使用 MTCNN (PyTorch) 人脸检测")
-        except Exception as e:
-            LOGGER.warning(f"⚠️ MTCNN 不可用: {e}")
-            _MTCNN = False  # 标记为不可用
-    return _MTCNN if _MTCNN is not False else None
 
 
 def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[Tuple[int, int, int, int]]:
@@ -51,12 +38,8 @@ def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[T
     Returns:
         (x1, y1, x2, y2) 人脸框坐标，或 None（未检测到）
     """
-    mtcnn = _get_mtcnn()
-    if mtcnn is None:
-        return None
-    
     try:
-        boxes, probs = mtcnn.detect(pil_img)
+        boxes, probs = _MTCNN.detect(pil_img)
         if boxes is not None and probs is not None and len(boxes) > 0:
             i = int(np.nanargmax(probs))
             if probs[i] is not None and probs[i] >= conf_thres:
@@ -71,7 +54,6 @@ def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[T
 def crop_face_square(pil_img: Image.Image, out_size: Tuple[int, int] = (512, 512)) -> Tuple[np.ndarray, Optional[Tuple[int, int, int, int]]]:
     """
     检测并裁剪人脸为正方形（与 dlib 训练预处理一致）
-    
     Args:
         pil_img: 输入 PIL Image
         out_size: 输出尺寸
