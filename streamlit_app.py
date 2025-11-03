@@ -25,33 +25,15 @@ except Exception:
     face_detection_msg = "ℹ️ 人脸检测功能未安装（将使用完整图像）"
 
 st.markdown(
-    f"""
+    """
     上传一张面部照片，系统将基于深度学习模型进行辅助评估，并提供可视化分析结果。
-    
-    **{face_detection_msg}**
     
     ⚠️ **重要提示**：本系统仅供科研参考使用，不能替代专业医疗诊断。如有疑虑，请及时就医咨询专业医生。
     """
 )
 
-# 侧边栏设置
-with st.sidebar:
-    st.header("⚙️ 设置")
-    use_face_detection = st.checkbox(
-        "启用人脸检测（MTCNN）", 
-        value=face_detection_available,  # 默认开启（如果可用）
-        disabled=not face_detection_available,
-        help="使用 PyTorch MTCNN 检测并裁剪人脸区域。如果检测失败，将自动使用完整图像。"
-    )
-    
-    st.markdown("---")
-    st.markdown("""
-    ### 关于人脸检测
-    - ✅ 纯 PyTorch 实现
-    - ✅ 无需编译依赖
-    - ✅ 自动回退机制
-    - 💡 建议：如果训练数据使用完整图像，可关闭此选项
-    """)
+# 默认启用人脸检测（如果可用）
+use_face_detection = face_detection_available
 
 if not WEIGHTS_PATH.exists():
     st.error(
@@ -93,9 +75,7 @@ if uploaded_file:
                 import traceback
                 st.code(traceback.format_exc())
             else:
-                # 显示实际使用的人脸检测方法
-                detector_used = result.get("detector") or "none"
-                st.info(f"图像处理方法: {detector_used}")
+
 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -141,9 +121,6 @@ if uploaded_file:
                 with col4:
                     if result.get("overlay") is not None:
                         st.image(result["overlay"], caption="模型关注区域热力图", use_column_width=True)
-
-                with st.expander("查看详细信息"):
-                    st.json({"logits": result.get("logits"), "probs": result.get("probs")})
 
 else:
     st.info("请先上传图片。")
