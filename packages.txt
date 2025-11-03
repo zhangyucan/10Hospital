@@ -1,6 +1,2 @@
-# System dependencies for Streamlit Cloud
-# This file is automatically processed by Streamlit Cloud
-
-# Required for opencv-python (if we add it later)
-# libgl1-mesa-glx
-# libglib2.0-0
+libgl1-mesa-glx
+libglib2.0-0
