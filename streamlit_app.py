@@ -10,8 +10,8 @@ WEIGHTS_PATH = Path(__file__).parent / "weights" / "epoch006_0.00005_0.29149_0.8
 # WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
 
 
-st.set_page_config(page_title="PCOS Probability Analyzer", page_icon="🩺")
-st.title("PCOS Probability Analyzer")
+st.set_page_config(page_title="PCOS 辅助筛查系统", page_icon="🩺")
+st.title("多囊卵巢综合征（PCOS）辅助筛查系统")
 
 # 检查人脸检测功能是否可用
 face_detection_methods = []
@@ -42,11 +42,11 @@ else:
 
 st.markdown(
     f"""
-    上传一张人脸照片，模型会给出患 PCOS 的概率，并展示 Grad-CAM 热力图。
+    上传一张面部照片，系统将基于深度学习模型进行辅助评估，并提供可视化分析结果。
     
     **{face_detection_msg}**
     
-    ⚠️ 模型仅用于科研原型，请勿作为医疗诊断依据。
+    ⚠️ **重要提示**：本系统仅供科研参考使用，不能替代专业医疗诊断。如有疑虑，请及时就医咨询专业医生。
     """
 )
 
@@ -76,24 +76,51 @@ if uploaded_file:
             else:
                 # 显示实际使用的人脸检测方法
                 detector_used = result.get("detector") or "none"
-                st.info(f"人脸检测方法: {detector_used}")
+                st.info(f"图像处理方法: {detector_used}")
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("预测类别", result.get("pred"))
+                    pred = result.get("pred")
+                    # 将 0/1 转换为专业描述
+                    if pred == 0:
+                        status = "未见明显风险特征"
+                        status_color = "🟢"
+                    elif pred == 1:
+                        status = "建议进一步检查"
+                        status_color = "🟡"
+                    else:
+                        status = str(pred)
+                        status_color = "⚪"
+                    st.metric("筛查结果", f"{status_color} {status}")
                 with col2:
                     probs = result.get("probs")
                     if probs and len(probs) > 1:
-                        st.metric("患 PCOS 概率", f"{probs[1] * 100:.2f}%")
+                        risk_level = probs[1] * 100
+                        st.metric("风险指标", f"{risk_level:.1f}%")
+                
+                # 添加结果解读说明
+                st.markdown("---")
+                st.subheader("📊 结果解读")
+                probs = result.get("probs")
+                if probs and len(probs) > 1:
+                    risk_level = probs[1] * 100
+                    if risk_level < 30:
+                        st.success("**低风险区间**：模型评估显示特征指标在正常范围内。")
+                    elif risk_level < 70:
+                        st.warning("**中等风险区间**：建议您关注相关症状，必要时咨询专业医生进行进一步检查。")
+                    else:
+                        st.error("**较高风险区间**：建议您尽快就医，进行全面的内分泌及超声检查，以获得准确诊断。")
+                
+                st.info("💡 **提示**：PCOS诊断需要结合临床症状、激素水平、超声检查等多项指标综合判断，本系统仅作为初步筛查参考。")
 
                 # 显示处理后的图像
                 col3, col4 = st.columns(2)
                 with col3:
                     if result.get("crop") is not None:
-                        st.image(result["crop"], caption="预测输入图像（人脸裁切）", use_column_width=True)
+                        st.image(result["crop"], caption="分析输入图像", use_column_width=True)
                 with col4:
                     if result.get("overlay") is not None:
-                        st.image(result["overlay"], caption="Grad-CAM 热力图", use_column_width=True)
+                        st.image(result["overlay"], caption="模型关注区域热力图", use_column_width=True)
 
                 with st.expander("查看详细信息"):
                     st.json({"logits": result.get("logits"), "probs": result.get("probs")})
