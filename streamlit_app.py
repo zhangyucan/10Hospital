@@ -1,28 +1,12 @@
 from __future__ import annotations
-
-import io
 from pathlib import Path
-
-from PIL import Image, ImageDraw
 import streamlit as st
-
 from pcos_infer import analyze_image_bytes
 
 WEIGHTS_PATH = Path(__file__).parent / "weights" / "epoch006_0.00005_0.29149_0.8864.pth"
-# WEIGHTS_PATH = r"/home/yucan/NewDisk/10Hospital/code/regressor/InceptionResNetV2_PCOS2nd/weights_clf/epoch006_0.00005_0.29149_0.8864.pth"
-
 
 st.set_page_config(page_title="PCOS 辅助筛查系统", page_icon="🩺")
 st.title("多囊卵巢综合征（PCOS）辅助筛查系统")
-
-# 检查人脸检测功能是否可用
-try:
-    from face_detect import crop_face_or_full
-    face_detection_available = True
-    face_detection_msg = "✅ 人脸检测功能可用 (MTCNN - PyTorch)"
-except Exception:
-    face_detection_available = False
-    face_detection_msg = "ℹ️ 人脸检测功能未安装（将使用完整图像）"
 
 st.markdown(
     """
@@ -31,9 +15,6 @@ st.markdown(
     ⚠️ **重要提示**：本系统仅供科研参考使用，不能替代专业医疗诊断。如有疑虑，请及时就医咨询专业医生。
     """
 )
-
-# 默认启用人脸检测（如果可用）
-use_face_detection = face_detection_available
 
 if not WEIGHTS_PATH.exists():
     st.error(
@@ -66,7 +47,6 @@ if uploaded_file:
                 
                 result = analyze_image_bytes(
                     bytes_data, 
-                    use_face=use_face_detection,
                     make_cam=True, 
                     target_index=1
                 )

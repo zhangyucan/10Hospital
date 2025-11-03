@@ -211,13 +211,13 @@ class GradCAMMinimal:
         return self._normalize_cam(cam)
 
 
-def analyze_image_bytes(img_bytes: bytes, use_face: bool = True, make_cam: bool = True, target_index: int = 1) -> Dict[str, object]:
+def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: int = 1) -> Dict[str, object]:
     """
     分析图像字节流，返回预测结果和可视化
+    必须检测到人脸才进行预测
     
     Args:
         img_bytes: 图像字节流
-        use_face: 是否启用人脸检测（必须检测到人脸才进行预测）
         make_cam: 是否生成 Grad-CAM 热力图
         target_index: Grad-CAM 目标类别索引
         
@@ -229,44 +229,38 @@ def analyze_image_bytes(img_bytes: bytes, use_face: bool = True, make_cam: bool 
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     
     # 人脸检测 + 裁剪（必须检测到人脸）
-    if use_face:
-        try:
-            rgb01, bbox = crop_face_square(img, out_size=INPUT_SIZE)
-            
-            if rgb01 is None or bbox is None:
-                # 未检测到人脸，返回错误
-                LOGGER.warning("未检测到人脸")
-                return {
-                    "error": "未检测到人脸",
-                    "message": "请上传包含清晰人脸的照片。建议：正面拍摄、光线充足、避免遮挡。",
-                    "pred": None,
-                    "probs": None,
-                    "logits": None,
-                    "overlay": None,
-                    "crop": None,
-                    "detector": "MTCNN (未检测到)",
-                    "bbox": None,
-                }
-            
-            LOGGER.info(f"成功检测到人脸: {bbox}")
-        except Exception as e:
-            LOGGER.error(f"人脸检测出错: {e}")
+    try:
+        rgb01, bbox = crop_face_square(img, out_size=INPUT_SIZE)
+        
+        if rgb01 is None or bbox is None:
+            # 未检测到人脸，返回错误
+            LOGGER.warning("未检测到人脸")
             return {
-                "error": "人脸检测失败",
-                "message": f"检测过程出错: {str(e)}",
+                "error": "未检测到人脸",
+                "message": "请上传包含清晰人脸的照片。建议：正面拍摄、光线充足、避免遮挡。",
                 "pred": None,
                 "probs": None,
                 "logits": None,
                 "overlay": None,
                 "crop": None,
-                "detector": "MTCNN (出错)",
+                "detector": "MTCNN (未检测到)",
                 "bbox": None,
             }
-    else:
-        # 不使用人脸检测，直接使用完整图像
-        rgb01 = np.asarray(img.resize(INPUT_SIZE)).astype("float32") / 255.0
-        bbox = None
-        LOGGER.info("未启用人脸检测，使用完整图像")
+        
+        LOGGER.info(f"成功检测到人脸: {bbox}")
+    except Exception as e:
+        LOGGER.error(f"人脸检测出错: {e}")
+        return {
+            "error": "人脸检测失败",
+            "message": f"检测过程出错: {str(e)}",
+            "pred": None,
+            "probs": None,
+            "logits": None,
+            "overlay": None,
+            "crop": None,
+            "detector": "MTCNN (出错)",
+            "bbox": None,
+        }
     
     # 预测
     logits, probs, pred = predict(rgb01)
