@@ -14,12 +14,29 @@ st.set_page_config(page_title="PCOS Probability Analyzer", page_icon="🩺")
 st.title("PCOS Probability Analyzer")
 
 # 检查人脸检测功能是否可用
+face_detection_methods = []
+try:
+    import mediapipe as mp
+    face_detection_methods.append("MediaPipe")
+except ImportError:
+    pass
+
+try:
+    import dlib
+    face_detection_methods.append("dlib")
+except ImportError:
+    pass
+
 try:
     import cv2
-    import dlib
-    face_detection_available = True
-    face_detection_msg = "✅ 人脸检测功能已启用"
+    face_detection_methods.append("OpenCV Haar")
 except ImportError:
+    pass
+
+if face_detection_methods:
+    face_detection_available = True
+    face_detection_msg = f"✅ 人脸检测功能已启用 ({', '.join(face_detection_methods)})"
+else:
     face_detection_available = False
     face_detection_msg = "ℹ️ 人脸检测功能未启用（将使用完整图像）"
 

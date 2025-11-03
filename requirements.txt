@@ -6,5 +6,5 @@ Pillow>=10.0
 torch==2.5.0
 torchvision==0.20.0
 
-# OpenCV for Haar cascade face detection (lightweight, no compilation needed)
-opencv-python-headless>=4.8.0
+# MediaPipe for lightweight face detection (cloud-friendly, no compilation)
+mediapipe>=0.10.0

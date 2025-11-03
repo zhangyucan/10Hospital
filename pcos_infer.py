@@ -15,7 +15,12 @@ import torch.nn.functional as F
 
 from model import get_model
 
-try:  # Optional preprocessing dependencies
+try:  # MediaPipe - preferred for cloud deployment
+    import mediapipe as mp
+except ImportError:
+    mp = None  # type: ignore
+
+try:  # Optional preprocessing dependencies (for local dev)
     import cv2
     import dlib
 except ImportError:  # pragma: no cover - optional path
@@ -31,7 +36,9 @@ LOGGER = logging.getLogger(__name__)
 
 # 缓存 shape predictor 以避免重复加载
 _shape_predictor_cache: Optional[object] = None
-# 记录最近使用的人脸检测方法: 'dlib' | 'haar' | None
+# 缓存 MediaPipe face detection
+_mediapipe_face_detection: Optional[object] = None
+# 记录最近使用的人脸检测方法: 'mediapipe' | 'dlib' | 'haar' | None
 _last_detection_method: Optional[str] = None
 
 
@@ -43,6 +50,27 @@ def _overlay_cam_on_image(rgb01: np.ndarray, cam01: np.ndarray, alpha: float = 0
     heatmap = np.stack([r, g, b], axis=-1)
     out = heatmap * alpha + np.clip(rgb01, 0, 1) * (1 - alpha)
     return (np.clip(out, 0, 1) * 255).astype(np.uint8)
+
+
+def _get_mediapipe_detector():
+    """延迟加载并缓存 MediaPipe face detection"""
+    global _mediapipe_face_detection
+    if _mediapipe_face_detection is not None:
+        return _mediapipe_face_detection
+    
+    if mp is None:
+        return None
+    
+    try:
+        _mediapipe_face_detection = mp.solutions.face_detection.FaceDetection(
+            model_selection=1,  # 1 for full range (0-5 meters), 0 for short range
+            min_detection_confidence=0.5
+        )
+        LOGGER.info("成功加载 MediaPipe face detection")
+        return _mediapipe_face_detection
+    except Exception as e:
+        LOGGER.error(f"加载 MediaPipe 失败: {e}")
+        return None
 
 
 def _get_shape_predictor():
@@ -70,6 +98,7 @@ def _get_shape_predictor():
 def _detect_primary_face(image_rgb: np.ndarray, use_alignment: bool = True) -> Optional[np.ndarray]:
     """
     Try to crop the most prominent face; fall back to the full frame if unavailable.
+    Priority: MediaPipe > dlib > OpenCV Haar > None
     
     Args:
         image_rgb: RGB 图像数组
@@ -78,14 +107,41 @@ def _detect_primary_face(image_rgb: np.ndarray, use_alignment: bool = True) -> O
 
     global _last_detection_method
 
-    # Prefer dlib when available (best quality). Fall back to OpenCV Haar cascade if dlib missing.
+    # Try MediaPipe first (lightweight, cloud-friendly, no compilation needed)
+    if mp is not None:
+        try:
+            detector = _get_mediapipe_detector()
+            if detector is not None:
+                # MediaPipe expects RGB uint8
+                results = detector.process(image_rgb)
+                if results.detections:
+                    # Get the first/largest detection
+                    detection = results.detections[0]
+                    bbox = detection.location_data.relative_bounding_box
+                    h, w = image_rgb.shape[:2]
+                    # Convert relative to absolute coordinates
+                    x0 = max(0, int(bbox.xmin * w))
+                    y0 = max(0, int(bbox.ymin * h))
+                    x1 = min(w, int((bbox.xmin + bbox.width) * w))
+                    y1 = min(h, int((bbox.ymin + bbox.height) * h))
+                    
+                    if x1 > x0 and y1 > y0:
+                        LOGGER.info(f"使用 MediaPipe 检测到人脸，区域: ({x0}, {y0}) -> ({x1}, {y1})")
+                        _last_detection_method = "mediapipe"
+                        return image_RGB_slice(image_rgb, x0, y0, x1, y1)
+                else:
+                    LOGGER.info("MediaPipe 未检测到人脸，尝试其他方法")
+        except Exception as e:
+            LOGGER.warning(f"MediaPipe 检测出错: {e}，尝试其他方法")
+
+    # Fallback to dlib if available (best quality but requires compilation)
     gray = None
-    if cv2 is None and dlib is None:
-        LOGGER.info("人脸检测模块未安装 (cv2/dlib)，将使用完整图像")
+    if cv2 is None and dlib is None and mp is None:
+        LOGGER.info("人脸检测模块未安装 (mediapipe/cv2/dlib)，将使用完整图像")
         _last_detection_method = None
         return None
 
-    # Try dlib path first
+    # Try dlib path
     if dlib is not None and cv2 is not None:
         try:
             detector = dlib.get_frontal_face_detector()
