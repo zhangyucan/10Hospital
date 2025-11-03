@@ -57,6 +57,10 @@ if uploaded_file:
             except Exception as exc:  # pragma: no cover - display to user
                 st.error(f"推理失败: {exc}")
             else:
+                # 显示实际使用的人脸检测方法
+                detector_used = result.get("detector") or "none"
+                st.info(f"人脸检测方法: {detector_used}")
+
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("预测类别", result.get("pred"))
