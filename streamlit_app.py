@@ -87,9 +87,9 @@ if uploaded_file:
                 probs = result.get("probs")
                 if probs and len(probs) > 1:
                     risk_level = probs[1] * 100
-                    if risk_level < 30:
+                    if risk_level < 50:
                         st.success("**低风险区间**：模型评估显示特征指标在正常范围内。")
-                    elif risk_level < 70:
+                    elif risk_level < 80:
                         st.warning("**中等风险区间**：建议您关注相关症状，必要时咨询专业医生进行进一步检查。")
                     else:
                         st.error("**较高风险区间**：建议您尽快就医，进行全面的内分泌及超声检查，以获得准确诊断。")
@@ -100,7 +100,7 @@ if uploaded_file:
                 col3, col4 = st.columns(2)
                 with col3:
                     if result.get("crop") is not None:
-                        st.image(result["crop"], caption="分析输入图像", use_column_width=True)
+                        st.image(result["crop"], caption="裁切后的输入图像", use_column_width=True)
                 
                 with col4:
                     if result.get("overlay") is not None:
