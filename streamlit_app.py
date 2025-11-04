@@ -8,6 +8,22 @@ WEIGHTS_PATH = Path(__file__).parent / "weights" / "epoch006_0.00005_0.29149_0.8
 # 语言配置
 LANGUAGES = {
     "中文": {
+        # 启动页面
+        "welcome_title": "AI 辅助 PCOS 面部筛查",
+        "welcome_subtitle": "本系统利用深度学习从面部图像中识别与多囊卵巢综合征（PCOS）相关的表型特征，进行非侵入式初筛与风险评估。",
+        "data_title": "📊 数据与内部验证",
+        "data_content": "本研究采用来自**上海市与湖南省三家三甲医院**的多中心数据（共 **325 例**，2023 年 6 月–2024 年 8 月），在统一、规范的采集流程下完成训练与验证。于内部留出测试集，PCOS 二分类准确率超过 **80%**。不同人群与成像条件下的实际表现可能存在差异，结果仅供参考。",
+        "disclaimer_title": "⚠️ 重要声明",
+        "disclaimer_content": """**PCOS 诊断需综合临床症状、激素水平、排卵功能与卵巢超声等多项医学指标。** 本系统目前开放测试，仅用于科学研究，以便搜集更多的科研资料和临床证据，**不构成医疗诊断或治疗依据**；任何健康相关决策请咨询正规医疗机构专业医生。""",
+        "privacy_title": "🔒 隐私与数据使用",
+        "privacy_content": """- 上传图像仅用于本次评估，默认不做长期存储。
+- 你可选择匿名授权数据用于模型改进（可在设置中随时撤回）。
+- 继续即表示你已阅读并同意本工具的使用与隐私说明。""",
+        "agree_button": "✅ 同意并开始",
+        "demo_button": "👀 仅体验演示",
+        "exit_button": "❌ 退出",
+        
+        # 主界面
         "title": "多囊卵巢综合征 (PCOS) 辅助筛查系统",
         "intro": "上传面部照片进行 AI 辅助风险评估，并提供可视化分析洞察。",
         "warning": "⚠️ **重要声明**: 本系统仅供研究使用，不能替代专业医学诊断。如有疑虑请咨询医疗专业人员。",
@@ -38,6 +54,22 @@ LANGUAGES = {
         "upload_to_begin": "请上传图像开始分析。",
     },
     "English": {
+        # 启动页面
+        "welcome_title": "AI-Assisted PCOS Facial Screening",
+        "welcome_subtitle": "This system uses deep learning to identify phenotypic features associated with Polycystic Ovary Syndrome (PCOS) from facial images for non-invasive preliminary screening and risk assessment.",
+        "data_title": "📊 Data & Internal Validation",
+        "data_content": "This study utilizes multi-center data from **three tertiary hospitals in Shanghai and Hunan Province** (**325 cases total**, June 2023 – August 2024), trained and validated under standardized collection protocols. Internal holdout test set achieved PCOS binary classification accuracy exceeding **80%**. Actual performance may vary across different populations and imaging conditions; results are for reference only.",
+        "disclaimer_title": "⚠️ Important Disclaimer",
+        "disclaimer_content": """**PCOS diagnosis requires comprehensive assessment of clinical symptoms, hormone levels, ovulation function, and ovarian ultrasound, among other medical indicators.** This system is currently in open testing for scientific research purposes to collect more research data and clinical evidence. **It does not constitute medical diagnosis or treatment advice**; please consult professional physicians at accredited medical institutions for any health-related decisions.""",
+        "privacy_title": "🔒 Privacy & Data Usage",
+        "privacy_content": """- Uploaded images are used solely for this assessment and are not stored long-term by default.
+- You may choose to anonymously authorize data for model improvement (can be revoked in settings at any time).
+- Proceeding indicates you have read and agree to this tool's usage and privacy statement.""",
+        "agree_button": "✅ Agree & Start",
+        "demo_button": "👀 Demo Only",
+        "exit_button": "❌ Exit",
+        
+        # 主界面
         "title": "Polycystic Ovary Syndrome (PCOS) Screening System",
         "intro": "Upload a facial photo for AI-powered risk assessment with visual analysis insights.",
         "warning": "⚠️ **Important Notice**: This system is for research purposes only and cannot replace professional medical diagnosis. Please consult a healthcare provider if you have concerns.",
@@ -69,12 +101,102 @@ LANGUAGES = {
     }
 }
 
-st.set_page_config(page_title="PCOS Screening System", page_icon="🩺")
+st.set_page_config(page_title="PCOS Screening System", page_icon="🩺", layout="wide")
 
-# 语言选择器（放在侧边栏）
+# 初始化 session state
+if "language" not in st.session_state:
+    st.session_state.language = None
+if "agreed" not in st.session_state:
+    st.session_state.agreed = False
+if "demo_mode" not in st.session_state:
+    st.session_state.demo_mode = False
+
+# ========== 启动页面 ==========
+if not st.session_state.agreed and not st.session_state.demo_mode:
+    # 语言选择
+    if st.session_state.language is None:
+        st.markdown("<h1 style='text-align: center;'>🩺</h1>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center;'>请选择语言 / Please Select Language</h2>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            col_cn, col_en = st.columns(2)
+            with col_cn:
+                if st.button("🇨🇳 中文", use_container_width=True, type="primary", key="lang_cn"):
+                    st.session_state.language = "中文"
+                    st.rerun()
+            with col_en:
+                if st.button("🇬🇧 English", use_container_width=True, type="primary", key="lang_en"):
+                    st.session_state.language = "English"
+                    st.rerun()
+        st.stop()
+    
+    # 显示启动页面内容
+    t = LANGUAGES[st.session_state.language]
+    
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        st.markdown(f"<h1 style='text-align: center;'>{t['welcome_title']}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-size: 1.1em;'>{t['welcome_subtitle']}</p>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 数据与验证
+        with st.expander(t["data_title"], expanded=True):
+            st.markdown(t["data_content"])
+        
+        # 重要声明
+        with st.expander(t["disclaimer_title"], expanded=True):
+            st.warning(t["disclaimer_content"])
+        
+        # 隐私说明
+        with st.expander(t["privacy_title"], expanded=True):
+            st.info(t["privacy_content"])
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 操作按钮
+        col_agree, col_demo, col_exit = st.columns(3)
+        with col_agree:
+            if st.button(t["agree_button"], use_container_width=True, type="primary", key="agree_btn"):
+                st.session_state.agreed = True
+                st.rerun()
+        with col_demo:
+            if st.button(t["demo_button"], use_container_width=True, key="demo_btn"):
+                st.session_state.demo_mode = True
+                st.rerun()
+        with col_exit:
+            if st.button(t["exit_button"], use_container_width=True, key="exit_btn"):
+                st.stop()
+    
+    st.stop()
+
+# ========== 主界面 ==========
+language = st.session_state.language
+t = LANGUAGES[language]
+
+# 侧边栏
 with st.sidebar:
-    language = st.selectbox("Language / 语言", list(LANGUAGES.keys()), index=0)
-    t = LANGUAGES[language]
+    st.markdown("### " + ("设置" if language == "中文" else "Settings"))
+    
+    # 语言切换
+    new_language = st.selectbox("Language / 语言", list(LANGUAGES.keys()), 
+                                 index=list(LANGUAGES.keys()).index(language))
+    if new_language != language:
+        st.session_state.language = new_language
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # 返回启动页
+    if st.button("← " + ("返回启动页" if language == "中文" else "Back to Welcome")):
+        st.session_state.agreed = False
+        st.session_state.demo_mode = False
+        st.rerun()
+    
+    # 演示模式提示
+    if st.session_state.demo_mode:
+        st.info("🔍 " + ("演示模式" if language == "中文" else "Demo Mode"))
 
 st.title(t["title"])
 
