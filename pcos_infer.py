@@ -75,7 +75,7 @@ def _get_face_detector():
 
 def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[Tuple[int, int, int, int]]:
     """
-    使用可用的检测器检测图像中的人脸（优先 dlib，回退 MTCNN）
+    使用可用的检测器检测图像中的人脸（优先 dlib，未检测到则尝试 MTCNN）
     
     Args:
         pil_img: PIL Image 对象
@@ -90,6 +90,8 @@ def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[T
         LOGGER.error("❌ 没有可用的人脸检测器")
         return None
     
+    result = None
+    
     try:
         if detector_type == "dlib":
             # dlib 检测
@@ -99,12 +101,15 @@ def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[T
             gray = np.mean(img_array, axis=2).astype(np.uint8) if img_array.ndim == 3 else img_array
             faces = detector_obj(gray, 1)
             
-            if len(faces) == 0:
-                return None
-            
-            # 取最大的人脸
-            face = max(faces, key=lambda rect: rect.width() * rect.height())
-            return (face.left(), face.top(), face.right(), face.bottom())
+            if len(faces) > 0:
+                # 取最大的人脸
+                face = max(faces, key=lambda rect: rect.width() * rect.height())
+                result = (face.left(), face.top(), face.right(), face.bottom())
+                LOGGER.info("✅ dlib 检测到人脸")
+            else:
+                LOGGER.info("⚠️ dlib 未检测到人脸，尝试使用 MTCNN...")
+                # dlib 未检测到，尝试 MTCNN
+                result = _try_mtcnn_detection(pil_img, conf_thres)
         
         elif detector_type == "mtcnn":
             # MTCNN 检测
@@ -113,10 +118,40 @@ def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[T
                 i = int(np.nanargmax(probs))
                 if probs[i] is not None and probs[i] >= conf_thres:
                     x1, y1, x2, y2 = boxes[i]
-                    return tuple(map(int, [x1, y1, x2, y2]))
+                    result = tuple(map(int, [x1, y1, x2, y2]))
     
     except Exception as e:
         LOGGER.warning(f"{detector_type} 检测失败: {e}")
+    
+    return result
+
+
+def _try_mtcnn_detection(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[Tuple[int, int, int, int]]:
+    """
+    尝试使用 MTCNN 检测人脸（当 dlib 失败时的后备方案）
+    
+    Args:
+        pil_img: PIL Image 对象
+        conf_thres: 置信度阈值
+        
+    Returns:
+        (x1, y1, x2, y2) 人脸框坐标，或 None（未检测到）
+    """
+    try:
+        from facenet_pytorch import MTCNN
+        mtcnn = MTCNN(keep_all=False, device='cpu', post_process=False)
+        boxes, probs = mtcnn.detect(pil_img)
+        
+        if boxes is not None and probs is not None and len(boxes) > 0:
+            i = int(np.nanargmax(probs))
+            if probs[i] is not None and probs[i] >= conf_thres:
+                x1, y1, x2, y2 = boxes[i]
+                LOGGER.info("✅ MTCNN 检测到人脸（后备方案）")
+                return tuple(map(int, [x1, y1, x2, y2]))
+        
+        LOGGER.info("⚠️ MTCNN 也未检测到人脸")
+    except Exception as e:
+        LOGGER.warning(f"MTCNN 后备检测失败: {e}")
     
     return None
 
