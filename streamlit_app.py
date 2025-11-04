@@ -94,8 +94,10 @@ st.warning(f"""{t['photo_guide_title']}
 
 uploaded_file = st.file_uploader(t["upload_prompt"], type=["jpg", "jpeg", "png"])
 
-if uploaded_file:
-    bytes_data = uploaded_file.read()
+if uploaded_file is not None:
+    # 读取文件内容
+    bytes_data = uploaded_file.getvalue()
+    
     if not bytes_data:
         st.warning(t["empty_file"])
     else:
