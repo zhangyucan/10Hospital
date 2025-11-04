@@ -162,11 +162,11 @@ if uploaded_file is not None:
                 col3, col4 = st.columns(2)
                 with col3:
                     if result.get("crop") is not None:
-                        st.image(result["crop"], caption=t["analyzed_face"], use_column_width=True)
+                        st.image(result["crop"], caption=t["analyzed_face"], use_container_width=True)
                 
                 with col4:
                     if result.get("overlay") is not None:
-                        st.image(result["overlay"], caption=t["attention_heatmap"], use_column_width=True)
+                        st.image(result["overlay"], caption=t["attention_heatmap"], use_container_width=True)
 
 else:
     st.info(t["upload_to_begin"])
