@@ -117,7 +117,7 @@ with st.sidebar:
     st.markdown("---")
     
     # 关于
-    with st.expander("ℹ️ " + ("关于本系统" if language == "中文" else "About This System"), expanded=False):
+    with st.expander("ℹ️ " + ("关于本系统" if language == "中文" else "About This System"), expanded=True):
         st.markdown(f"**{t['welcome_title']}**")
         st.caption(t['welcome_subtitle'])
         
