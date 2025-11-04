@@ -109,54 +109,50 @@ if "agreed" not in st.session_state:
 
 # ========== 启动页面 ==========
 if not st.session_state.agreed:
-    st.markdown("<h1 style='text-align: center;'>🩺</h1>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center;'>请选择语言 / Please Select Language</h2>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # 语言选择（如果还没选择）
+    # 默认语言为中文
     if st.session_state.language is None:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            col_cn, col_en = st.columns(2)
-            with col_cn:
-                if st.button("🇨🇳 中文", use_container_width=True, type="primary", key="lang_cn"):
-                    st.session_state.language = "中文"
-                    st.rerun()
-            with col_en:
-                if st.button("🇬🇧 English", use_container_width=True, type="primary", key="lang_en"):
-                    st.session_state.language = "English"
-                    st.rerun()
-        st.stop()
+        st.session_state.language = "中文"
     
-    # 显示启动页面内容（已选择语言后）
     t = LANGUAGES[st.session_state.language]
     
-    # 语言切换小按钮
-    col_lang = st.columns([5, 1])
-    with col_lang[1]:
+    # 右上角语言切换按钮
+    col_header = st.columns([6, 1])
+    with col_header[1]:
         if st.button("🌐 " + ("Switch to English" if st.session_state.language == "中文" else "切换到中文"), key="switch_lang"):
             st.session_state.language = "English" if st.session_state.language == "中文" else "中文"
             st.rerun()
     
-    col1, col2, col3 = st.columns([1, 3, 1])
+    # 主标题
+    st.markdown("<h1 style='text-align: center;'>🩺</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center;'>{t['welcome_title']}</h1>", unsafe_allow_html=True)
+    if st.session_state.language == "中文":
+        st.markdown("<h3 style='text-align: center; color: gray;'>AI-Assisted PCOS Facial Screening</h3>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h3 style='text-align: center; color: gray;'>AI 辅助 PCOS 面部筛查</h3>", unsafe_allow_html=True)
+    
+    st.markdown(f"<p style='text-align: center; font-size: 1.1em; margin-top: 20px;'>{t['welcome_subtitle']}</p>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 内容区域
+    col1, col2, col3 = st.columns([1, 4, 1])
     with col2:
-        st.markdown(f"<h1 style='text-align: center;'>{t['welcome_title']}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-size: 1.1em;'>{t['welcome_subtitle']}</p>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
         # 数据与验证
-        with st.expander(t["data_title"], expanded=True):
-            st.markdown(t["data_content"])
+        st.markdown(f"### {t['data_title']}")
+        st.info(t["data_content"])
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # 重要声明
-        with st.expander(t["disclaimer_title"], expanded=True):
-            st.warning(t["disclaimer_content"])
-        
-        # 隐私说明
-        with st.expander(t["privacy_title"], expanded=True):
-            st.info(t["privacy_content"])
+        st.markdown(f"### {t['disclaimer_title']}")
+        st.warning(t["disclaimer_content"])
         
         st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 隐私说明
+        st.markdown(f"### {t['privacy_title']}")
+        st.info(t["privacy_content"])
+        
+        st.markdown("<br><br>", unsafe_allow_html=True)
         
         # 操作按钮
         col_agree, col_exit = st.columns(2)
