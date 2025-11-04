@@ -19,8 +19,6 @@ LANGUAGES = {
         "privacy_content": """- 上传图像仅用于本次评估，默认不做长期存储。
 - 你可选择匿名授权数据用于模型改进（可在设置中随时撤回）。
 - 继续即表示你已阅读并同意本工具的使用与隐私说明。""",
-        "agree_button": "✅ 同意并开始",
-        "exit_button": "❌ 退出",
         
         # 主界面
         "title": "多囊卵巢综合征 (PCOS) 辅助筛查系统",
@@ -64,8 +62,6 @@ LANGUAGES = {
         "privacy_content": """- Uploaded images are used solely for this assessment and are not stored long-term by default.
 - You may choose to anonymously authorize data for model improvement (can be revoked in settings at any time).
 - Proceeding indicates you have read and agree to this tool's usage and privacy statement.""",
-        "agree_button": "✅ Agree & Start",
-        "exit_button": "❌ Exit",
         
         # 主界面
         "title": "Polycystic Ovary Syndrome (PCOS) Screening System",
@@ -103,68 +99,7 @@ st.set_page_config(page_title="PCOS Screening System", page_icon="🩺", layout=
 
 # 初始化 session state
 if "language" not in st.session_state:
-    st.session_state.language = None
-if "agreed" not in st.session_state:
-    st.session_state.agreed = False
-
-# ========== 启动页面 ==========
-if not st.session_state.agreed:
-    # 默认语言为中文
-    if st.session_state.language is None:
-        st.session_state.language = "中文"
-    
-    t = LANGUAGES[st.session_state.language]
-    
-    # 右上角语言切换按钮
-    col_header = st.columns([6, 1])
-    with col_header[1]:
-        if st.button("🌐 " + ("Switch to English" if st.session_state.language == "中文" else "切换到中文"), key="switch_lang"):
-            st.session_state.language = "English" if st.session_state.language == "中文" else "中文"
-            st.rerun()
-    
-    # 主标题
-    st.markdown("<h1 style='text-align: center;'>🩺</h1>", unsafe_allow_html=True)
-    st.markdown(f"<h1 style='text-align: center;'>{t['welcome_title']}</h1>", unsafe_allow_html=True)
-    if st.session_state.language == "中文":
-        st.markdown("<h3 style='text-align: center; color: gray;'>AI-Assisted PCOS Facial Screening</h3>", unsafe_allow_html=True)
-    else:
-        st.markdown("<h3 style='text-align: center; color: gray;'>AI 辅助 PCOS 面部筛查</h3>", unsafe_allow_html=True)
-    
-    st.markdown(f"<p style='text-align: center; font-size: 1.1em; margin-top: 20px;'>{t['welcome_subtitle']}</p>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # 内容区域
-    col1, col2, col3 = st.columns([1, 4, 1])
-    with col2:
-        # 数据与验证
-        st.markdown(f"### {t['data_title']}")
-        st.info(t["data_content"])
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 重要声明
-        st.markdown(f"### {t['disclaimer_title']}")
-        st.warning(t["disclaimer_content"])
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 隐私说明
-        st.markdown(f"### {t['privacy_title']}")
-        st.info(t["privacy_content"])
-        
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        
-        # 操作按钮
-        col_agree, col_exit = st.columns(2)
-        with col_agree:
-            if st.button(t["agree_button"], use_container_width=True, type="primary", key="agree_btn"):
-                st.session_state.agreed = True
-                st.rerun()
-        with col_exit:
-            if st.button(t["exit_button"], use_container_width=True, key="exit_btn"):
-                st.stop()
-    
-    st.stop()
+    st.session_state.language = "中文"  # 默认中文
 
 # ========== 主界面 ==========
 language = st.session_state.language
@@ -183,10 +118,28 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # 返回启动页
-    if st.button("← " + ("返回启动页" if language == "中文" else "Back to Welcome")):
-        st.session_state.agreed = False
-        st.rerun()
+    # 关于
+    with st.expander("ℹ️ " + ("关于本系统" if language == "中文" else "About This System"), expanded=False):
+        st.markdown(f"**{t['welcome_title']}**")
+        st.caption(t['welcome_subtitle'])
+        
+        st.markdown("---")
+        
+        # 数据与验证
+        st.markdown(f"**{t['data_title']}**")
+        st.caption(t["data_content"])
+        
+        st.markdown("---")
+        
+        # 重要声明
+        st.markdown(f"**{t['disclaimer_title']}**")
+        st.caption(t["disclaimer_content"])
+        
+        st.markdown("---")
+        
+        # 隐私说明
+        st.markdown(f"**{t['privacy_title']}**")
+        st.caption(t["privacy_content"])
 
 st.title(t["title"])
 
