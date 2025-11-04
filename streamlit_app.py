@@ -20,7 +20,6 @@ LANGUAGES = {
 - 你可选择匿名授权数据用于模型改进（可在设置中随时撤回）。
 - 继续即表示你已阅读并同意本工具的使用与隐私说明。""",
         "agree_button": "✅ 同意并开始",
-        "demo_button": "👀 仅体验演示",
         "exit_button": "❌ 退出",
         
         # 主界面
@@ -66,7 +65,6 @@ LANGUAGES = {
 - You may choose to anonymously authorize data for model improvement (can be revoked in settings at any time).
 - Proceeding indicates you have read and agree to this tool's usage and privacy statement.""",
         "agree_button": "✅ Agree & Start",
-        "demo_button": "👀 Demo Only",
         "exit_button": "❌ Exit",
         
         # 主界面
@@ -108,17 +106,15 @@ if "language" not in st.session_state:
     st.session_state.language = None
 if "agreed" not in st.session_state:
     st.session_state.agreed = False
-if "demo_mode" not in st.session_state:
-    st.session_state.demo_mode = False
 
 # ========== 启动页面 ==========
-if not st.session_state.agreed and not st.session_state.demo_mode:
-    # 语言选择
+if not st.session_state.agreed:
+    st.markdown("<h1 style='text-align: center;'>🩺</h1>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>请选择语言 / Please Select Language</h2>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 语言选择（如果还没选择）
     if st.session_state.language is None:
-        st.markdown("<h1 style='text-align: center;'>🩺</h1>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'>请选择语言 / Please Select Language</h2>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             col_cn, col_en = st.columns(2)
@@ -132,8 +128,15 @@ if not st.session_state.agreed and not st.session_state.demo_mode:
                     st.rerun()
         st.stop()
     
-    # 显示启动页面内容
+    # 显示启动页面内容（已选择语言后）
     t = LANGUAGES[st.session_state.language]
+    
+    # 语言切换小按钮
+    col_lang = st.columns([5, 1])
+    with col_lang[1]:
+        if st.button("🌐 " + ("Switch to English" if st.session_state.language == "中文" else "切换到中文"), key="switch_lang"):
+            st.session_state.language = "English" if st.session_state.language == "中文" else "中文"
+            st.rerun()
     
     col1, col2, col3 = st.columns([1, 3, 1])
     with col2:
@@ -156,14 +159,10 @@ if not st.session_state.agreed and not st.session_state.demo_mode:
         st.markdown("<br>", unsafe_allow_html=True)
         
         # 操作按钮
-        col_agree, col_demo, col_exit = st.columns(3)
+        col_agree, col_exit = st.columns(2)
         with col_agree:
             if st.button(t["agree_button"], use_container_width=True, type="primary", key="agree_btn"):
                 st.session_state.agreed = True
-                st.rerun()
-        with col_demo:
-            if st.button(t["demo_button"], use_container_width=True, key="demo_btn"):
-                st.session_state.demo_mode = True
                 st.rerun()
         with col_exit:
             if st.button(t["exit_button"], use_container_width=True, key="exit_btn"):
@@ -191,12 +190,7 @@ with st.sidebar:
     # 返回启动页
     if st.button("← " + ("返回启动页" if language == "中文" else "Back to Welcome")):
         st.session_state.agreed = False
-        st.session_state.demo_mode = False
         st.rerun()
-    
-    # 演示模式提示
-    if st.session_state.demo_mode:
-        st.info("🔍 " + ("演示模式" if language == "中文" else "Demo Mode"))
 
 st.title(t["title"])
 
