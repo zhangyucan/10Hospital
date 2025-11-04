@@ -21,32 +21,102 @@ LOGGER = logging.getLogger(__name__)
 
 # 模型缓存
 _model_cache: Optional[nn.Module] = None
-from facenet_pytorch import MTCNN
-_MTCNN = MTCNN(keep_all=False, device='cpu', post_process=False)
-LOGGER.info("✅ 使用 MTCNN (PyTorch) 人脸检测")
 
+# 人脸检测器缓存
+_face_detector = None
+_detector_type = None
+
+
+def _get_face_detector():
+    """
+    延迟初始化人脸检测器，优先使用 dlib，不可用则使用 MTCNN
+    
+    Returns:
+        tuple: (detector, detector_type) 或 (None, None)
+    """
+    global _face_detector, _detector_type
+    
+    if _face_detector is not None:
+        return _face_detector, _detector_type
+    
+    # 尝试使用 dlib（优先）
+    try:
+        import dlib
+        predictor_path = _BASE_DIR / "weights" / "shape_predictor_68_face_landmarks.dat"
+        if predictor_path.exists():
+            detector = dlib.get_frontal_face_detector()
+            predictor = dlib.shape_predictor(str(predictor_path))
+            _face_detector = (detector, predictor)
+            _detector_type = "dlib"
+            LOGGER.info("✅ 使用 dlib 人脸检测（68 关键点）")
+            return _face_detector, _detector_type
+        else:
+            LOGGER.warning(f"⚠️ dlib 模型文件不存在: {predictor_path}")
+    except ImportError:
+        LOGGER.info("ℹ️ dlib 不可用，尝试使用 MTCNN")
+    except Exception as e:
+        LOGGER.warning(f"⚠️ dlib 初始化失败: {e}")
+    
+    # 回退到 MTCNN
+    try:
+        from facenet_pytorch import MTCNN
+        mtcnn = MTCNN(keep_all=False, device='cpu', post_process=False)
+        _face_detector = mtcnn
+        _detector_type = "mtcnn"
+        LOGGER.info("✅ 使用 MTCNN (PyTorch) 人脸检测")
+        return _face_detector, _detector_type
+    except ImportError:
+        LOGGER.error("❌ MTCNN 不可用")
+    except Exception as e:
+        LOGGER.error(f"❌ MTCNN 初始化失败: {e}")
+    
+    return None, None
 
 
 def detect_face_box(pil_img: Image.Image, conf_thres: float = 0.6) -> Optional[Tuple[int, int, int, int]]:
     """
-    使用 MTCNN 检测图像中置信度最高的人脸
+    使用可用的检测器检测图像中的人脸（优先 dlib，回退 MTCNN）
     
     Args:
         pil_img: PIL Image 对象
-        conf_thres: 置信度阈值
+        conf_thres: 置信度阈值（仅 MTCNN）
         
     Returns:
         (x1, y1, x2, y2) 人脸框坐标，或 None（未检测到）
     """
+    detector, detector_type = _get_face_detector()
+    
+    if detector is None:
+        LOGGER.error("❌ 没有可用的人脸检测器")
+        return None
+    
     try:
-        boxes, probs = _MTCNN.detect(pil_img)
-        if boxes is not None and probs is not None and len(boxes) > 0:
-            i = int(np.nanargmax(probs))
-            if probs[i] is not None and probs[i] >= conf_thres:
-                x1, y1, x2, y2 = boxes[i]
-                return tuple(map(int, [x1, y1, x2, y2]))
+        if detector_type == "dlib":
+            # dlib 检测
+            import dlib
+            detector_obj, predictor = detector
+            img_array = np.array(pil_img)
+            gray = np.mean(img_array, axis=2).astype(np.uint8) if img_array.ndim == 3 else img_array
+            faces = detector_obj(gray, 1)
+            
+            if len(faces) == 0:
+                return None
+            
+            # 取最大的人脸
+            face = max(faces, key=lambda rect: rect.width() * rect.height())
+            return (face.left(), face.top(), face.right(), face.bottom())
+        
+        elif detector_type == "mtcnn":
+            # MTCNN 检测
+            boxes, probs = detector.detect(pil_img)
+            if boxes is not None and probs is not None and len(boxes) > 0:
+                i = int(np.nanargmax(probs))
+                if probs[i] is not None and probs[i] >= conf_thres:
+                    x1, y1, x2, y2 = boxes[i]
+                    return tuple(map(int, [x1, y1, x2, y2]))
+    
     except Exception as e:
-        LOGGER.warning(f"MTCNN 检测失败: {e}")
+        LOGGER.warning(f"{detector_type} 检测失败: {e}")
     
     return None
 
@@ -216,6 +286,7 @@ def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: i
         
         if rgb01 is None or bbox is None:
             # 未检测到人脸，返回错误
+            _, detector_type = _get_face_detector()
             LOGGER.warning("未检测到人脸")
             return {
                 "error": "未检测到人脸",
@@ -225,12 +296,14 @@ def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: i
                 "logits": None,
                 "overlay": None,
                 "crop": None,
-                "detector": "MTCNN (未检测到)",
+                "detector": f"{detector_type.upper() if detector_type else 'Unknown'} (未检测到)",
                 "bbox": None,
             }
         
-        LOGGER.info(f"成功检测到人脸: {bbox}")
+        _, detector_type = _get_face_detector()
+        LOGGER.info(f"成功检测到人脸: {bbox} (使用 {detector_type})")
     except Exception as e:
+        _, detector_type = _get_face_detector()
         LOGGER.error(f"人脸检测出错: {e}")
         return {
             "error": "人脸检测失败",
@@ -240,7 +313,7 @@ def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: i
             "logits": None,
             "overlay": None,
             "crop": None,
-            "detector": "MTCNN (出错)",
+            "detector": f"{detector_type.upper() if detector_type else 'Unknown'} (出错)",
             "bbox": None,
         }
     
@@ -268,12 +341,16 @@ def analyze_image_bytes(img_bytes: bytes, make_cam: bool = True, target_index: i
     # 生成预览图像
     preview_img = Image.fromarray((rgb01 * 255).astype(np.uint8))
     
+    # 获取检测器类型
+    _, detector_type = _get_face_detector()
+    detector_name = "dlib (68-point)" if detector_type == "dlib" else "MTCNN (PyTorch)" if detector_type == "mtcnn" else "Unknown"
+    
     return {
         "pred": pred,
         "probs": probs,
         "logits": logits,
         "overlay": overlay_img,
         "crop": preview_img,
-        "detector": "MTCNN (PyTorch)" if bbox else "完整图像",
+        "detector": detector_name,
         "bbox": bbox,
     }
