@@ -17,7 +17,6 @@ LANGUAGES = {
         "disclaimer_content": """**PCOS 诊断需综合临床症状、激素水平、排卵功能与卵巢超声等多项医学指标。** 本系统目前开放测试，仅用于科学研究，以便搜集更多的科研资料和临床证据，**不构成医疗诊断或治疗依据**；任何健康相关决策请咨询正规医疗机构专业医生。""",
         "privacy_title": "🔒 隐私与数据使用",
         "privacy_content": """- 上传图像仅用于本次评估，默认不做长期存储。
-- 你可选择匿名授权数据用于模型改进（可在设置中随时撤回）。
 - 继续即表示你已阅读并同意本工具的使用与隐私说明。""",
         
         # 主界面
@@ -60,7 +59,6 @@ LANGUAGES = {
         "disclaimer_content": """**PCOS diagnosis requires comprehensive assessment of clinical symptoms, hormone levels, ovulation function, and ovarian ultrasound, among other medical indicators.** This system is currently in open testing for scientific research purposes to collect more research data and clinical evidence. **It does not constitute medical diagnosis or treatment advice**; please consult professional physicians at accredited medical institutions for any health-related decisions.""",
         "privacy_title": "🔒 Privacy & Data Usage",
         "privacy_content": """- Uploaded images are used solely for this assessment and are not stored long-term by default.
-- You may choose to anonymously authorize data for model improvement (can be revoked in settings at any time).
 - Proceeding indicates you have read and agree to this tool's usage and privacy statement.""",
         
         # 主界面
